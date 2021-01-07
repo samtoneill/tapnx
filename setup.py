@@ -17,7 +17,6 @@ Read the `docs`_ or see usage examples and demos on `GitHub`_.
 
 .. _GitHub: https://github.com/tapnx/tapnx-examples
 .. _docs: https://tapnx.readthedocs.io
-.. _OSMnx\: New Methods for Acquiring, Constructing, Analyzing, and Visualizing Complex Street Networks: http://geoffboeing.com/publications/osmnx-complex-street-networks/
 """
 
 # list of classifiers from the PyPI classifiers trove
