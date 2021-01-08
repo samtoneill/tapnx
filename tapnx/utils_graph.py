@@ -24,10 +24,8 @@ def graph_from_edgedf(df_edges, edge_attr=None):
     return G
 
 def graph_positions_from_nodedf(G, df_nodes):
-    # This reads in the positional data of the graph (optional)
-    nodes_df = pd.read_csv('{}_node.csv'.format(filename), index_col=[0])
     # read and format the positional data
-    pos = nodes_df.to_dict(orient='index')
+    pos = df_nodes.to_dict(orient='index')
     G.graph['pos'] = {id:(pos[id][x],pos[id][y]) for id, (x,y) in pos.items()}
 
     return G
