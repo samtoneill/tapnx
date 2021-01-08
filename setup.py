@@ -51,7 +51,7 @@ else:
 # now call setup
 setup(
     name="tapnx",
-    version="1.0.0",
+    version="0.0.1",
     description=DESC,
     long_description=LONG_DESCRIPTION,
     classifiers=CLASSIFIERS,
