@@ -6,11 +6,13 @@ import networkx as nx
 
 from . import utils_graph
 
-def link_based_method(G, method, aec_gap_tolerance=10**-4, max_iter=None):
+def link_based_method(G, method, aec_gap_tol=10**-4, max_iter=None, line_search_tol=0.05, collect_data=False):
     
     G.graph['sp'] = defaultdict(lambda: None)
     x = np.zeros(len(G.edges()),dtype="float64")
     y = np.zeros(len(G.edges()),dtype="float64")
+
+    data = {'AEC':[], 'x':[], 'weight':[], 'objective':[]}
     
     i = 1
     while True:
@@ -36,10 +38,16 @@ def link_based_method(G, method, aec_gap_tolerance=10**-4, max_iter=None):
         
         #print(relative_gap(G))
         AEC  = average_excess_cost(G)
-        rel_gap = relative_gap(G)
+        # rel_gap = relative_gap(G)
         print('AEC: {}'.format(AEC))
-        print('rel gap: {}'.format(rel_gap))
-        if AEC < aec_gap_tolerance  and i > 1:
+        # print('rel gap: {}'.format(rel_gap))
+        if collect_data and i > 1:
+            data['AEC'].append(AEC)
+            data['x'].append(x)
+            data['weight'].append(edge_func(G,x))
+            data['objective'].append(objective(G,x))
+
+        if AEC < aec_gap_tol  and i > 1:
             break
         
         if max_iter:
@@ -52,7 +60,7 @@ def link_based_method(G, method, aec_gap_tolerance=10**-4, max_iter=None):
             if method == 'successive_averages':
                 lam = 1/(i)
             elif method == 'frank_wolfe':
-                lam = line_search(G, x, y, epsilon=0.005)
+                lam = _line_search(G, x, y, tol=line_search_tol)
             
         # convex combination of solutions
         x = lam*y + (1-lam)*x
@@ -64,9 +72,9 @@ def link_based_method(G, method, aec_gap_tolerance=10**-4, max_iter=None):
 
         i+=1
         
-    print(get_np_array_from_edge_attribute(G, 'weight'))
-    print(objective(G,x))
-    print(G.edges(data=True))
+    # print(get_np_array_from_edge_attribute(G, 'weight'))
+    # print(objective(G,x))
+    # print(G.edges(data=True))
     # Iteration
     #-----------
     # For every OD pair
@@ -75,15 +83,18 @@ def link_based_method(G, method, aec_gap_tolerance=10**-4, max_iter=None):
     # Step 3: Update the current soluiton x <- lx* +(1-l)x for l in [0,1]
     # Step 4: Calculate the travel times
     # Step 5: If convergence met (relative gap), stop. Otherwise return to Step 2
-    return True
+    return G, data
 
-def frank_wolfe(G, aec_gap_tolerance=10**-4):
-    link_based_method(G, 'frank_wolfe', aec_gap_tolerance=aec_gap_tolerance)
-    return G
+# need to update docstrings and kwgs (clean up)
+def frank_wolfe(G, **lbm_kwargs):
+    kwargs = {k: v for k, v in lbm_kwargs.items()}
+    G, data = link_based_method(G, 'frank_wolfe', **kwargs)
+    return G, data
 
-def successive_averages(G, aec_gap_tolerance=1):
-    link_based_method(G, 'successive_averages', aec_gap_tolerance=aec_gap_tolerance)
-    return G
+def successive_averages(G,  **lbm_kwargs):
+    kwargs = {k: v for k, v in lbm_kwargs.items()}
+    G, data = link_based_method(G, 'successive_averages',  **kwargs)
+    return G, data
 
 def total_system_travel_time(G):
     x = get_np_array_from_edge_attribute(G, 'x')
@@ -102,18 +113,20 @@ def average_excess_cost(G):
     d = d = np.array([G.graph['trips'][key[0]][key[1]] for key, value in G.graph['sp'].items()])
     return (total_system_travel_time(G)-all_demand_on_fastest_paths(G))/np.sum(d)
     
-def line_search(G, x, y, epsilon=0.01):
+def _line_search(G, x, y, tol=0.01):
     p = 0
     q = 1
     while True:
         alpha = (p+q)/2.0
+
+        # dz/d_alpha derivative
         D_alpha = sum((y-x)*edge_func(G, x + alpha*(y-x)))
         
         if D_alpha <= 0:
             p = alpha
         else:
             q = alpha
-        if q-p < epsilon:
+        if q-p < tol:
             break
         
     return (p+q)/2
