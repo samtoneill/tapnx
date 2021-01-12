@@ -1,8 +1,12 @@
+"""Plot functions for TAPnx."""
+
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
+
+from . import utils_graph
 
 def get_edge_colors_by_attr(
     G, attr, num_bins=None, cmap="plasma", start=0, stop=1, na_color="none", equal_size=False
@@ -37,7 +41,9 @@ def get_edge_colors_by_attr(
     vals = pd.Series(nx.get_edge_attributes(G, attr))
     return _get_colors_by_value(vals, num_bins, cmap, start, stop, na_color, equal_size)
 
-def plot_graph(G, edge_color="#999999", edge_labels=False,  node_labels=True, node_size=2):
+def plot_graph(G, edge_color="#999999", edge_labels=False, edge_label_attr='id',
+                node_labels=True, node_size=2,
+                show=False, save=False, close=False, filepath=None):
     """
     Plot a networkx graph
     Parameters
@@ -50,11 +56,22 @@ def plot_graph(G, edge_color="#999999", edge_labels=False,  node_labels=True, no
         they will be mapped to colors using the edge_cmap and edge_vmin,edge_vmax parameters.
     edge_labels: bool
         draw edge labels
+    edge_label_attr: string
+        attribut to display on edge label
     node_labels: bool
         draw node labels
     node_size : scalar or array, optional (default=300)
        Size of nodes.  If an array is specified it must be the
        same length as nodelist.
+    show : bool
+        if True, call pyplot.show() to show the figure
+    close : bool
+        if True, call pyplot.close() to close the figure
+    save : bool
+        if True, save the figure to disk at filepath
+    filepath : string
+        if save is True, the path to the file. file format determined from
+        extension. if None, use settings.imgs_folder/image.png
     Returns
     -------
     fig, ax : tuple
@@ -62,15 +79,32 @@ def plot_graph(G, edge_color="#999999", edge_labels=False,  node_labels=True, no
     """
 
     fig, ax = plt.subplots()
-    if 'pos' in G.graph:
-        # draw the graph with positions
-        nx.draw(G, pos=G.graph['pos'], node_size=node_size, edge_color=edge_color, ax=ax, with_labels=node_labels)
-    else:
-        nx.draw(G, node_size=node_size, edge_color=edge_color, ax=ax, with_labels=node_labels)
-
+    nx.draw(
+            G, pos=G.graph['pos'], node_size=node_size, 
+            edge_color=edge_color, 
+            ax=ax, with_labels=node_labels
+    )
+    
     if edge_labels:
-        edge_labels = nx.get_edge_attributes(G,'id')
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+        edge_labels = nx.get_edge_attributes(G,edge_label_attr)
+        nx.draw_networkx_edge_labels(G, pos=G.graph['pos'], edge_labels=edge_labels)
+
+    return fig, ax
+
+def plot_graph_path(G, path, ax=None, **pg_kwargs):
+    if ax is None:
+        # plot the graph but not the route, and override any user show/close
+        # args for now: we'll do that later
+        override = {"show", "save", "close"}
+        kwargs = {k: v for k, v in pg_kwargs.items() if k not in override}
+        fig, ax = plot_graph(G, show=False, save=False, close=False, **kwargs)
+    else:
+        fig = ax.figure
+
+    path_edges = utils_graph.edges_from_path(path)
+    pos = G.graph['pos']
+
+    nx.draw_networkx_edges(G,pos,edgelist=path_edges,edge_color='r',ax=ax)
     
     return fig, ax
 
