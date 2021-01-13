@@ -1,5 +1,6 @@
 """TAPnx init."""
 
+from .algorithms import conjugate_frank_wolfe
 from .algorithms import frank_wolfe
 from .algorithms import successive_averages
 from .helper import TNTP_to_pandas
@@ -17,3 +18,4 @@ from .utils_graph import graph_from_edgedf
 from .utils_graph import graph_positions_from_nodedf
 from .utils_graph import graph_trips_from_tripsdf
 from .utils_graph import path_length
+from .utils_graph import remove_edge

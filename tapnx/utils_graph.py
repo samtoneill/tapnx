@@ -52,7 +52,7 @@ def graph_positions_from_nodedf(G, df_nodes):
 
     return G
 
-def graph_edge_weight_func(G, edge_func, objective):
+def graph_edge_weight_func(G, edge_func, edge_func_integral):
     """
     Update the weight attribute of the graph. This is used to calculate the shortest path
     ----------
@@ -67,7 +67,7 @@ def graph_edge_weight_func(G, edge_func, objective):
     G : networkx.DiGraph
     """
     G.graph['edge_func'] = edge_func
-    G.graph['objective'] = objective
+    G.graph['edge_func_integral'] = edge_func_integral
     return G
 
 def graph_trips_from_tripsdf(G, df_trips):
@@ -106,5 +106,9 @@ def graph_from_csv(edges_filename, nodes_filename=None, trips_filename=None, edg
 def _label_edges_with_id(G):
     for index, (u,v) in enumerate(sorted(G.edges(), key= lambda edge: (edge[0], edge[1]))):
         G[u][v]['id'] = index
+    return G
 
+def remove_edge(G, u, v):
+    G.remove_edge(u,v)
+    G = _label_edges_with_id(G)
     return G
