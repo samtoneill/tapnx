@@ -2,6 +2,7 @@
 
 from .algorithms import conjugate_frank_wolfe
 from .algorithms import frank_wolfe
+from .algorithms import gradient_projection
 from .algorithms import successive_averages
 from .helper import TNTP_to_pandas
 from .helper import TNTP_net_to_pandas
