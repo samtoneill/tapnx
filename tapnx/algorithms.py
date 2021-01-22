@@ -119,8 +119,8 @@ def gradient_projection(G,
     alpha=1):
     # Update to store shortest paths that have been used 
     data = {'AEC':[], 'relative_gap':[], 'x':[], 'weight':[], 'objective':[]}
-    
-    x = np.zeros(len(G.edges()),dtype="float64") 
+    no_edges = len(G.edges())
+    x = np.zeros(no_edges,dtype="float64") 
     _update_edge_attribute(G, 'x', x)
     _update_edge_attribute(G, 'weight', _edge_func(G,x,G.graph['edge_func']))
     _update_edge_attribute(G, 'derivative', _edge_func(G,x,edge_func_derivative))
@@ -129,12 +129,12 @@ def gradient_projection(G,
     # dictionary to store paths for an (origin, destination)
     # e.g. {(origin, destination):{(1,2,3): {'cost', 4, 'flow',1}} stores a path [1,2,3] with length 4 and flow 1
     G.graph['paths'] = defaultdict(lambda: [])
-    G.graph['paths_1'] = defaultdict(lambda: {'D': np.empty((len(G.edges()),0),dtype="int32"), 'h':np.empty(0) })
+    G.graph['paths_1'] = defaultdict(lambda: {'D': [], 'h':[] })
     i = 0
     while True:
         print('Iteration i = {}--------------------\n'.format(i))
         
-        x = np.zeros(len(G.edges()),dtype="float64") 
+        x = np.zeros(no_edges,dtype="float64") 
         for key, values in G.graph['trips'].items():
             #print('computing shortest paths')
             lengths, all_paths = nx.single_source_dijkstra(G, source=key, target=None, weight='weight')
@@ -159,18 +159,11 @@ def gradient_projection(G,
                         #     'flow':0
                         # }
                         edges_id = [G[u][v]['id'] for u,v in utils_graph.edges_from_path(path)]
-                        path_vector = np.zeros((len(G.edges()),1),dtype="int32")
-                        path_vector[edges_id,0] = 1
+                        path_vector = np.zeros(no_edges,dtype="int32")
+                        path_vector[edges_id] = 1
                         
-                        G.graph['paths_1'][(origin, int(destination))]['D'] = np.append(
-                            G.graph['paths_1'][(origin, int(destination))]['D'],
-                            path_vector,
-                            axis=1
-                        )
-                        G.graph['paths_1'][(origin, int(destination))]['h'] = np.append(
-                            G.graph['paths_1'][(origin, int(destination))]['h'],
-                            0
-                        )
+                        G.graph['paths_1'][(origin, int(destination))]['D'].append(path_vector)
+                        G.graph['paths_1'][(origin, int(destination))]['h'].append(0)
                         G.graph['paths'][(origin, int(destination))].append(tuple(path))
                     
                     G.graph['sp'][(origin,destination)] = {'path': path, 'path_length': path_length}
@@ -222,8 +215,8 @@ def gradient_projection(G,
                     
                     
                     
-                    D = G.graph['paths_1'][(origin, int(destination))]['D']
-                    h = G.graph['paths_1'][(origin, int(destination))]['h']
+                    D = np.array(G.graph['paths_1'][(origin, int(destination))]['D']).T
+                    h = np.array(G.graph['paths_1'][(origin, int(destination))]['h'])
                     c = np.dot(np.transpose(D),t)
 
                     if len(h) > 1:
@@ -238,7 +231,7 @@ def gradient_projection(G,
                         
                         x += _edge_flow_from_paths(D,h_prime)
                         # # store the updated flow
-                        G.graph['paths_1'][(origin, int(destination))]['h'] = h_prime
+                        G.graph['paths_1'][(origin, int(destination))]['h'] = h_prime.tolist()
                     
                     else:
                         x += _edge_flow_from_paths(D,h)
@@ -282,6 +275,7 @@ def shift_flow(G,D,c, h, t, t_prime, demand, alpha):
     # amend 
     H[sp_id] = 1
     v = -g/H
+    #v = -g
     D_diff = D - D[:,[sp_id]]
     
     # update h, not that the update for the shortest path will be 0
