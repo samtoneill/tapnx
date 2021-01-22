@@ -40,12 +40,12 @@ def link_based_method(
     # Update to store shortest paths that have been used 
     data = {'AEC':[], 'relative_gap':[], 'x':[], 'weight':[], 'objective':[]}
     
-    i = 1
+    i = 0
     while True:
         _update_edge_attribute(G, 'x', x)
         _update_edge_attribute(G, 'weight', _edge_func(G,x, G.graph['edge_func']))
         y_aon = np.zeros(len(G.edges()),dtype="float64")
-        #print('iteration {}...............'.format(i))
+        print('iteration {}...............'.format(i))
         # iterate through the Origin/Destination pairs
         for key, values in G.graph['trips'].items():
             lengths, paths = nx.single_source_dijkstra(G, source=key, target=None)
@@ -64,7 +64,7 @@ def link_based_method(
                         y_aon[edge_id] += demand
         
         # Target solution y
-        if (i > 1) and (method=='conjugate_frank_wolfe'):
+        if (i > 0) and (method=='conjugate_frank_wolfe'):
             [u,v,d] = [list(t) for t in zip(*list(sorted(G.edges(data=True))))]
             H = np.diag(list(map(edge_func_derivative, u,v,d,x)))
             alpha = _conjugate_step(x, y, y_aon, H)
@@ -73,19 +73,21 @@ def link_based_method(
             y = alpha*y + (1-alpha)*y_aon
         else:
             y = y_aon
-
-        # store the data
+        
         AEC  = _average_excess_cost(G)
         rel_gap = _relative_gap(G)
-        print('i: {}'.format(i))
-        print('AEC: {}'.format(AEC))
-        print('rel gap: {}'.format(rel_gap))
-        if collect_data and i > 1:
+        # store the data
+        if collect_data and i > 0:                    
+            print('i: {}'.format(i))
+            print('AEC: {}'.format(AEC))
+            print('rel gap: {}'.format(rel_gap))
             data['AEC'].append(AEC)
             data['relative_gap'].append(rel_gap)
             data['x'].append(x)
             data['weight'].append(_edge_func(G,x,G.graph['edge_func']))
             data['objective'].append(objective(G,x))
+
+
 
         # convergence tests
         if AEC < aec_gap_tol  and i > 1:
@@ -97,7 +99,7 @@ def link_based_method(
         
         # generate new solution x based on previous solution x and new target y
         lam = 1
-        if not i == 1:
+        if not i == 0:
             # Step 3: Update the current solution x <- lx* +(1-l)x for l in [0,1]
             if method == 'successive_averages':
                 lam = 1/(i)
@@ -106,11 +108,13 @@ def link_based_method(
             
         # convex combination of old solution and target solution
         x = lam*y + (1-lam)*x
-
+        
+        
         i+=1
         
     return G, data
 
+@profile
 def gradient_projection(G, 
     edge_func_derivative,
     aec_gap_tol=10**-4, 
@@ -124,6 +128,13 @@ def gradient_projection(G,
     _update_edge_attribute(G, 'x', x)
     _update_edge_attribute(G, 'weight', _edge_func(G,x,G.graph['edge_func']))
     _update_edge_attribute(G, 'derivative', _edge_func(G,x,edge_func_derivative))
+
+    a = _get_np_array_from_edge_attribute(G, 'a')
+    b = _get_np_array_from_edge_attribute(G, 'b')
+    cap = _get_np_array_from_edge_attribute(G, 'c')
+    n = _get_np_array_from_edge_attribute(G, 'n')
+
+
     G.graph['sp'] = defaultdict(lambda: None)
 
     # dictionary to store paths for an (origin, destination)
@@ -134,10 +145,10 @@ def gradient_projection(G,
     while True:
         print('Iteration i = {}--------------------\n'.format(i))
         
-        x = np.zeros(no_edges,dtype="float64") 
+        
         for key, values in G.graph['trips'].items():
             #print('computing shortest paths')
-            lengths, all_paths = nx.single_source_dijkstra(G, source=key, target=None, weight='weight')
+            #lengths, all_paths = nx.single_source_dijkstra(G, source=key, target=None)#, weight='weight')
             #print('finished computing shortest paths for orgin {}'.format(key))
             #print(lengths)
             origin = key
@@ -148,16 +159,13 @@ def gradient_projection(G,
                 # if there are positive trips
                 if not ((demand == 0) or (demand == np.nan)):
                     #print('computing shortest path for od pair = ({},{})'.format(origin, destination))
-                    path = all_paths[int(destination)]
-                    path_length = lengths[int(destination)]
-                    #path_length, path = nx.single_source_dijkstra(G, source=key, target=int(value))
+                    #path = all_paths[int(destination)]
+                    #path_length = lengths[int(destination)]
+                    path_length, path = nx.single_source_dijkstra(G, source=key, target=int(value))
                     paths = G.graph['paths'][(origin, int(destination))]
                     
                     if not tuple(path) in paths:
                         
-                        # G.graph['paths'][(origin, int(destination))][tuple(path)] = {
-                        #     'flow':0
-                        # }
                         edges_id = [G[u][v]['id'] for u,v in utils_graph.edges_from_path(path)]
                         path_vector = np.zeros(no_edges,dtype="int32")
                         path_vector[edges_id] = 1
@@ -166,16 +174,54 @@ def gradient_projection(G,
                         G.graph['paths_1'][(origin, int(destination))]['h'].append(0)
                         G.graph['paths'][(origin, int(destination))].append(tuple(path))
                     
-                    G.graph['sp'][(origin,destination)] = {'path': path, 'path_length': path_length}
-                        
-
                     if i == 0:
-                        # assign all demand to single path
-                        #print('assigning first path for od = ({},{})'.format(key, value))
                         G.graph['paths_1'][(origin, int(destination))]['h'][0] = demand
+
+                    G.graph['sp'][(origin,destination)] = {'path': path, 'path_length': path_length}
+
+                    D = np.array(G.graph['paths_1'][(origin, int(destination))]['D']).T
+                    h = np.array(G.graph['paths_1'][(origin, int(destination))]['h'])
+                    
+                    #print('shifting flow')
+                    if len(h) > 1:
                         
+                        
+                        c = np.dot(np.transpose(D),t)
+                        # DO NOT REPORT THIS... COMPILATION TIME IS INCLUDED IN THE EXECUTION TIME!
+                        #start = time.time()
+                        h_prime = shift_flow(G,D,c, h, t, t_prime,demand, alpha)
+                        #end = time.time()
+                        #print("Elapsed (with compilation) = %s" % (end - start))
+                        
+                        x += _edge_flow_from_paths(D,h_prime)
+                        x -= _edge_flow_from_paths(D,h)
+                        # # store the updated flow
+                        G.graph['paths_1'][(origin, int(destination))]['h'] = h_prime.tolist()
+                        
+                        #_update_edge_attribute(G, 'x', x)
+                        #t = _edge_func(G,x, G.graph['edge_func'])
+                        t = _edge_func_np(x,a,b,cap,n)
+                        #_update_edge_attribute(G, 'weight', t)
+                        #t_prime = _edge_func(G,x,edge_func_derivative)
+                        t_prime = _edge_func_derivative_np(x,a,b,cap,n)
+                        #_update_edge_attribute(G, 'derivative', t_prime)
+                                                
+                    else:
+                        if i == 0:
+                            x += _edge_flow_from_paths(D,h)
+                            #_update_edge_attribute(G, 'x', x)
+                            #t = _edge_func(G,x, G.graph['edge_func'])
+                            t = _edge_func_np(x,a,b,cap,n)
+                            #_update_edge_attribute(G, 'weight', t)
+                            #t_prime = _edge_func(G,x,edge_func_derivative)
+                            t_prime = _edge_func_derivative_np(x,a,b,cap,n)
+                            #_update_edge_attribute(G, 'derivative', t_prime)
+                        
+                        
+        # compute average excess cost, based on travel times at the time of computing shortest paths.
         AEC  = _average_excess_cost(G)
         rel_gap  = _relative_gap(G)
+        
         # print('rel gap: {}'.format(AEC))
         if i > 0:
             print('AEC: {}'.format(AEC))
@@ -189,58 +235,18 @@ def gradient_projection(G,
             if i > max_iter:
                 break
 
-        
-        if collect_data and i > 1:
+        if collect_data and i > 0:
             data['AEC'].append(AEC)
             data['relative_gap'].append(rel_gap)
             data['x'].append(x)
-            data['weight'].append(_edge_func(G,x,G.graph['edge_func']))
+            data['weight'].append(t)
             data['objective'].append(objective(G,x))
-        
-        t = _get_np_array_from_edge_attribute(G, 'weight')
-        t_prime = _get_np_array_from_edge_attribute(G, 'derivative')
-
-        for key, values in G.graph['trips'].items():            
-            origin = key
-            # iterate through the destinations for an origin
-            #print(origin)
-            #print('shifting flow for od pair {}'.format(origin))
-            for value in values:
-                destination = value
-                demand = G.graph['trips'][origin][destination]
-                if not ((demand == 0) or (demand == np.nan)):
-                    
-                    # refer to previous work or look for possible smarter way to update edges
-                    paths = G.graph['paths'][(origin, int(destination))]
-                    
-                    
-                    
-                    D = np.array(G.graph['paths_1'][(origin, int(destination))]['D']).T
-                    h = np.array(G.graph['paths_1'][(origin, int(destination))]['h'])
-                    c = np.dot(np.transpose(D),t)
-
-                    if len(h) > 1:
-                        
-                        
-
-                        # DO NOT REPORT THIS... COMPILATION TIME IS INCLUDED IN THE EXECUTION TIME!
-                        #start = time.time()
-                        h_prime = shift_flow(G,D,c, h, t, t_prime,demand, alpha)
-                        #end = time.time()
-                        #print("Elapsed (with compilation) = %s" % (end - start))
-                        
-                        x += _edge_flow_from_paths(D,h_prime)
-                        # # store the updated flow
-                        G.graph['paths_1'][(origin, int(destination))]['h'] = h_prime.tolist()
-                    
-                    else:
-                        x += _edge_flow_from_paths(D,h)
-
+    
         
         _update_edge_attribute(G, 'x', x)
-        _update_edge_attribute(G, 'weight', _edge_func(G,x, G.graph['edge_func']))
-        _update_edge_attribute(G, 'derivative', _edge_func(G,x,edge_func_derivative))
-
+        _update_edge_attribute(G, 'weight', t)
+        _update_edge_attribute(G, 'derivative', t_prime)
+        
         
 
         i+=1
@@ -260,27 +266,33 @@ def gradient_projection(G,
     # Step 4: Drop empty paths (or tag)
     # Step 5: if convergence satisfied, stop. Otherwise return to step 2
 
-#@jit
+
+@profile
 def shift_flow(G,D,c, h, t, t_prime, demand, alpha):
     sp_id = np.argmin(c)
 
     g = c - c[sp_id]
-    g[sp_id] = 0
+    
 
     # get all non common links for each of the paths
-    non_common_links = np.bitwise_xor(D, D[:,[sp_id]])
-
+    #non_common_links = np.bitwise_xor(D, D[:,[sp_id]])
+    non_common_links = np.abs(D - D[:,[sp_id]])
+    
     H = np.dot(np.transpose(non_common_links), t_prime)
+    
     
     # amend 
     H[sp_id] = 1
-    v = -g/H
+    #v = g/H
+
     #v = -g
-    D_diff = D - D[:,[sp_id]]
+    #D_diff = D - D[:,[sp_id]]
     
     # update h, not that the update for the shortest path will be 0
-    h_prime = np.maximum(np.zeros(len(h)), h+ alpha*v)
+    h_prime = np.maximum(np.zeros(len(h)), h - alpha*g/H)
+    
     h_prime[sp_id] += demand - np.sum(h_prime)
+    
 
     return h_prime
 
@@ -308,9 +320,12 @@ def total_system_travel_time(G):
     return np.dot(x,t)
 
 def _all_demand_on_fastest_paths(G):
+    
     k = np.array([value['path_length'] for key, value in G.graph['sp'].items()])
     
     d = np.array([G.graph['trips'][key[0]][key[1]] for key, value in G.graph['sp'].items()])
+    #print([(key,value) for key, value in G.graph['sp'].items()])
+    #time.sleep(2)
     return np.dot(k,d)
 
 def _relative_gap(G):
@@ -372,6 +387,20 @@ def _update_edge_attribute(G, attr, vector):
 def _edge_func(G,x, func):
     [u,v,d] = [list(t) for t in zip(*list(sorted(G.edges(data=True))))]
     return list(map(func, u,v,d,x))
+# @njit
+# def _edge_func_np(x,a,b,c,n):
+#     return a*(1+b*(x/c)**n)
+
+def _edge_func_np(x,a,b,c,n):
+    return a*(1+b*(x/c)*(x/c)*(x/c))
+
+# @njit
+# def _edge_func_derivative_np(x,a,b,c,n):
+#     return a*b*n*c**(-n)*x**(n-1)
+
+def _edge_func_derivative_np(x,a,b,c,n):
+    return (a*b*n*x*x*x)/(c*c*c*c)
+
 
 def _get_np_array_from_edge_attribute(G, attr):
     return np.array([value for (key, value) in sorted(nx.get_edge_attributes(G, attr).items())],dtype="float64")

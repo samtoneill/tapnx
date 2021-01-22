@@ -54,17 +54,17 @@ def TNTP_net_to_pandas(filename):
 
     print('converting TNPT net file to pandas edge dataframe')
 
-    df_net = pd.read_csv(filename, header=5, sep='\t')
+    df_net = pd.read_csv(filename, header=6, sep='\t')
     # clean up dataframe
     df_net.columns = df_net.columns.str.strip()
     df_net.drop(['~', ';'], axis=1, inplace=True)
     
-    s = [int(item) for item in df_net['Init node'].tolist()]
-    t = [int(item) for item in df_net['Term node'].tolist()]
-    a = np.array([item for item in df_net['Free Flow Time'].tolist()], dtype=np.float64)
-    b = np.array(df_net['B'].tolist(), dtype=np.float64)
-    c = np.array(df_net['Capacity'].tolist(), dtype=np.float64)
-    n = np.array(df_net['Power'].tolist(), dtype=np.float64)
+    s = [int(item) for item in df_net['init_node'].tolist()]
+    t = [int(item) for item in df_net['term_node'].tolist()]
+    a = np.array([item for item in df_net['free_flow_time'].tolist()], dtype=np.float64)
+    b = np.array(df_net['b'].tolist(), dtype=np.float64)
+    c = np.array(df_net['capacity'].tolist(), dtype=np.float64)
+    n = np.array(df_net['power'].tolist(), dtype=np.float64)
 
     data = list(zip(s,t,a,b,c,n))
     df_edges = pd.DataFrame(data, columns =['source', 'target', 'a', 'b', 'c', 'n']) 

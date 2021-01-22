@@ -3,6 +3,7 @@
 import networkx as nx
 import numpy as np
 import pandas as pd
+import time
 
 def edges_from_path(path):
     return list(zip(path,path[1:]))
