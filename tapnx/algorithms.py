@@ -4,6 +4,7 @@ from collections import defaultdict
 import numpy as np
 import networkx as nx
 import time
+from . import utils_graph
 from numba import njit, jit
 
 from . import utils_graph
@@ -37,10 +38,10 @@ def link_based_method(
 
     no_edges = G.graph['no_edges']
     x = np.zeros(no_edges,dtype="float64") 
-    a = _get_np_array_from_edge_attribute(G, 'a')
-    b = _get_np_array_from_edge_attribute(G, 'b')
-    cap = _get_np_array_from_edge_attribute(G, 'c')
-    n = _get_np_array_from_edge_attribute(G, 'n')
+    a = utils_graph.get_np_array_from_edge_attribute(G, 'a')
+    b = utils_graph.get_np_array_from_edge_attribute(G, 'b')
+    cap = utils_graph.get_np_array_from_edge_attribute(G, 'c')
+    n = utils_graph.get_np_array_from_edge_attribute(G, 'n')
 
     trips = G.graph['trips']
 
@@ -50,7 +51,7 @@ def link_based_method(
     i = 0
     while True:
         weight = _edge_func_np(x,a,b,cap,n)
-        _update_edge_attribute(G, 'weight', weight)
+        utils_graph.update_edge_attribute(G, 'weight', weight)
         y = np.zeros(no_edges,dtype="float64")
         print('iteration {}...............'.format(i))
         # iterate through the Origin/Destination pairs
@@ -159,10 +160,10 @@ def gradient_projection(G,
     no_edges = G.graph['no_edges']
 
     # edge attributes used in the calculation of edge travel times
-    a = _get_np_array_from_edge_attribute(G, 'a')
-    b = _get_np_array_from_edge_attribute(G, 'b')
-    cap = _get_np_array_from_edge_attribute(G, 'c')
-    n = _get_np_array_from_edge_attribute(G, 'n')
+    a = utils_graph.get_np_array_from_edge_attribute(G, 'a')
+    b = utils_graph.get_np_array_from_edge_attribute(G, 'b')
+    cap = utils_graph.get_np_array_from_edge_attribute(G, 'c')
+    n = utils_graph.get_np_array_from_edge_attribute(G, 'n')
 
     # initialise edge flow x and edge travel time t
     x = np.zeros(no_edges,dtype="float64") 
@@ -184,22 +185,23 @@ def gradient_projection(G,
         x_aec = np.copy(x)
         t_aec = np.copy(t)
         
-        _update_edge_attribute(G, 'weight',t)
+        utils_graph.update_edge_attribute(G, 'weight',t)
         for origin, destinations in trips.items():
 
             # Create a copy of the graph and remove the out edges that are connected to zones based on whether they are 
             # prohibited to be thru nodes
-            H = G.copy()
+            J = G.copy()
             zones_prohibited = list(range(1,origin))
             zones_prohibited += list(range(origin+1, G.graph['first_thru_node']))
             out_edges_for_removal = G.out_edges(zones_prohibited)
-            H.remove_edges_from(out_edges_for_removal)
+            J.remove_edges_from(out_edges_for_removal)
 
             # calculate shortest paths, networkx does not (check) have an option for a list of targets
-            lengths, all_paths = nx.single_source_dijkstra(H, source=origin, target=None, weight='weight')
+            lengths, all_paths = nx.single_source_dijkstra(J, source=origin, target=None, weight='weight')
             
             # iterate through the destinations for an origin
             for destination in destinations:
+                # calculate shortest paths, networkx does not (check) have an option for a list of targets
                 
                 # get demand associated with origin/destination
                 demand = trips[origin][destination]
@@ -325,20 +327,12 @@ def _average_excess_cost(trips, shortest_paths, x, weight):
     d =  np.array([trips[key[0]][key[1]] for key, value in shortest_paths.items()])
     
     return (total_system_travel_time(x, weight)-_all_demand_on_fastest_paths(trips, shortest_paths))/np.sum(d)
-    
-def _update_edge_attribute(G, attr, vector):
-    d = dict(zip(sorted(G.edges()), vector))
-    nx.set_edge_attributes(G, d, attr)
-    return G
 
 def _edge_func_np(x,a,b,c,n):
     return a*(1+b*(x/c)*(x/c)*(x/c)*(x/c))
 
 def _edge_func_derivative_np(x,a,b,c,n):
     return (a*b*n*x*x*x)/(c*c*c*c)
-
-def _get_np_array_from_edge_attribute(G, attr):
-    return np.array([value for (key, value) in sorted(nx.get_edge_attributes(G, attr).items())],dtype="float64")
 
 def objective(x,a,b,c,n):
     return a*x*(1 + (b/(n+1))*(x/c)**n) 

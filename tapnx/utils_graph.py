@@ -31,6 +31,7 @@ def graph_from_edgedf(df_edges, edge_attr=None):
     G = nx.from_pandas_edgelist(df_edges, source='source', target='target',
                                  edge_attr=edge_attr, create_using=nx.DiGraph())
     G.graph['weight'] = 'weight'
+    G.graph['no_edges'] = len(G.edges())
     G.graph['pos'] = None
     G = _label_edges_with_id(G)
     return G
@@ -97,8 +98,15 @@ def _label_edges_with_id(G):
         G[u][v]['id'] = index
     return G
 
+def get_np_array_from_edge_attribute(G, attr):
+    return np.array([value for (key, value) in sorted(nx.get_edge_attributes(G, attr).items())],dtype="float64")
+
 def remove_edge(G, u, v):
     G.remove_edge(u,v)
     G = _label_edges_with_id(G)
     return G
 
+def update_edge_attribute(G, attr, vector):
+    d = dict(zip(sorted(G.edges()), vector))
+    nx.set_edge_attributes(G, d, attr)
+    return G

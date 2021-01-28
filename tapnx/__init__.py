@@ -13,9 +13,11 @@ from .plot import get_edge_colors_by_attr
 from .plot import plot_graph
 from .plot import plot_graph_path
 from .utils_graph import edges_from_path
+from .utils_graph import get_np_array_from_edge_attribute
 from .utils_graph import graph_from_csv
 from .utils_graph import graph_from_edgedf
 from .utils_graph import graph_positions_from_nodedf
 from .utils_graph import trips_from_tripsdf
 from .utils_graph import path_length
 from .utils_graph import remove_edge
+from .utils_graph import update_edge_attribute
