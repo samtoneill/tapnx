@@ -93,6 +93,15 @@ def graph_from_csv(edges_filename, nodes_filename=None, trips_filename=None, edg
 
     return df_edges, df_nodes, df_trips
 
+def draw_additional_labels(G, labels, pos, shift, ax, font_color='k'):
+    pos_higher = {}
+    for k, v in pos.items():
+            # shift node to right and up or down depending on sign of shift
+            pos_higher[k] = (v[0]+np.abs(shift), v[1]+shift)
+
+    nx.draw_networkx_labels(G, pos_higher,labels, font_color=font_color, ax=ax)
+    return ax
+
 def _label_edges_with_id(G):
     for index, (u,v) in enumerate(sorted(G.edges(), key= lambda edge: (edge[0], edge[1]))):
         G[u][v]['id'] = index
