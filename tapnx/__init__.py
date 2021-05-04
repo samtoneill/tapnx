@@ -9,9 +9,12 @@ from .helper import TNTP_node_to_pandas
 from .helper import TNTP_trips_to_pandas
 from .helper import TNTP_flow_to_pandas
 from .helper import readTNTPMetadata
+from .lp_algorithm import milp_tap
 from .plot import get_edge_colors_by_attr
 from .plot import plot_graph
 from .plot import plot_graph_path
+from .nonlin_algorithm import scipy_optimise_column_gen
+from .gekko_nonlin_algorithm import gekko_optimise_column_gen
 from .utils_graph import edges_from_path
 from .utils_graph import get_np_array_from_edge_attribute
 from .utils_graph import graph_from_csv
