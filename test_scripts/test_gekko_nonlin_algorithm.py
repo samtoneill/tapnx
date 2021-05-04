@@ -38,11 +38,11 @@ G.graph['no_edges'] = int(meta_data['NUMBER OF LINKS'])
 
 # fig, ax = tapnx.plot_graph(G, node_size=200, node_labels=True)
 # plt.show()
-f,cf,x,cx,min_d = tapnx.gekko_optimise_column_gen(G,lam=1)
-f,cf,x,cx,max_d = tapnx.gekko_optimise_column_gen(G,min_max_type=-1, lam=1)
+#f,cf,x,cx,min_d = tapnx.gekko_optimise_column_gen(G,lam=1)
+#f,cf,x,cx,max_d = tapnx.gekko_optimise_column_gen(G,min_max_type=-1, lam=1)
 
-f,cf,x,cx,min_tt = tapnx.gekko_optimise_column_gen(G,lam=0)
-f,cf,x,cx,max_tt = tapnx.gekko_optimise_column_gen(G,min_max_type=-1, lam=0)
+f,cf,x,cx,min_tt = tapnx.gekko_optimise_column_gen(G,lam=0, remote=True)
+#f,cf,x,cx,max_tt = tapnx.gekko_optimise_column_gen(G,min_max_type=-1, lam=0)
 
 print(min_d)
 print(max_d)

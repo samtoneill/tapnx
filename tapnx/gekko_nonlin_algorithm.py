@@ -8,8 +8,13 @@ from . import utils_graph
 from numba import njit, jit
 from scipy.optimize import minimize, optimize, LinearConstraint
 from gekko import GEKKO
+from itertools import islice
 
 from . import utils_graph
+
+
+def k_shortest_paths(G, source, target, k, weight=None):
+    return islice(nx.shortest_simple_paths(G, source, target, weight=weight), k)
 
 # due to the way Gekko returns the solution, flatten list is done differently
 def edge_flows_for_sol(f,D,a,b,c,n):
@@ -68,7 +73,8 @@ def gekko_optimise_column_gen(
     min_tt=0,
     max_d=1,
     max_tt=1,
-    remote=False):
+    remote=False,
+    initial_paths=1):
 
     # compute demand vector
 
@@ -140,44 +146,36 @@ def gekko_optimise_column_gen(
             #print(zones_prohibited)
 
         # calculate shortest paths, networkx does not (check) have an option for a list of targets
-        lengths, all_paths = nx.single_source_dijkstra(J, source=origin, target=None, weight='weight')
+        #lengths, all_paths = nx.single_source_dijkstra(J, source=origin, target=None, weight='weight')
         # iterate through the destinations for an origin
         for destination in destinations:
+            
+            
             # calculate shortest paths, networkx does not (check) have an option for a list of targets
             
             # get demand associated with origin/destination
             demand = trips[origin][destination]
             # if there are positive trips (otherwise no need to do anything)
             if not ((demand == 0) or (demand == np.nan)):
+                
                 # get the shortest path and its length for the origin/destination
                 od_ids.append(od_id)
                 
                 demands.append(demand)
-                shortest_path = all_paths[int(destination)]
-                shortest_path_length = lengths[int(destination)]
-                # get the paths for the 
-                paths = od_paths[od_id]['paths']
-
-                # overwrite the shortest path
-                shortest_paths[(origin,destination)] = {'path': shortest_path, 'path_length': shortest_path_length}
-
-                # if the shortest path is not yet in the paths, add it
-                if not tuple(shortest_path) in paths:
-                    
-                    path_edges = [G[u][v]['id'] for u,v in utils_graph.edges_from_path(shortest_path)]
+                paths = k_shortest_paths(G, origin, destination, initial_paths)
+                for path in paths:
+                    path_edges = [G[u][v]['id'] for u,v in utils_graph.edges_from_path(path)]
                     path_vector = np.zeros(no_edges,dtype="int32")
                     path_vector[path_edges] = 1
                     
                     od_paths[od_id]['D'].append(path_vector)
                     od_paths[od_id]['h'].append(0)
-                    od_paths[od_id]['paths'].append(tuple(shortest_path))
+                    od_paths[od_id]['paths'].append(tuple(path))
                     no_paths += 1
                 # if this is the first iteration, then assign all demand to shortest path
-                if i == 0:
-                    od_paths[od_id]['h'][0] = demand
 
+                print(od_paths[od_id]['paths'])
                 od_id += 1
-
 
     # require 
     # od_ids list of od ids
