@@ -1,7 +1,6 @@
 """Graph utility functions."""
 
 import networkx as nx
-from igraph import Graph
 import numpy as np
 import pandas as pd
 import time
