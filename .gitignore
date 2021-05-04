@@ -129,5 +129,5 @@ dmypy.json
 .pyre/
 
 # test data files
-/test_data
+#/test_data
 #/test_scripts
