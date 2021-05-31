@@ -1,4 +1,5 @@
 """ Network Equilibrium algorithms for TAP """
+""" Used for weighted sum on sioux falls"""
 
 from collections import defaultdict
 import numpy as np
@@ -40,10 +41,16 @@ def edge_flows_no_zeros(f,D,a,b,c,n,m):
 def system_optimal(x,a,b,c,n,m):
   return m.sum(x*(a*(1+b*(x/c)**n)))
 
+def distance(x,d):
+    return d*x
+
+def travel_time(x,a,b,c,n):
+    return x*(a*(1+b*(x/c)**n))
+
 def weighted_system_optimal(x,a,b,c,n,d,lam,min_d,max_d,min_tt,max_tt,m):
-    dist = d*x
-    tt = x*(a*(1+b*(x/c)**n))
-    return m.sum( lam*( (dist-min_d)/(max_d-min_d) ) + (1-lam)*( (tt-min_tt)/(max_tt-min_tt) ) )
+    dist = distance(x,d)
+    tt = travel_time(x,a,b,c,n)
+    return  1000*m.sum( lam*(dist-min_d)/(max_d-min_d) + (1-lam)*(tt-min_tt)/(max_tt-min_tt) )
 
 def beckmann_sum(x,a,b,c,n,m):
   return m.sum(a*x*(1 + (b/(n+1))*(x/c)**n) )
@@ -53,9 +60,9 @@ def beckmann_edge(x,i,a,b,c,n,m):
 
 
 def edge_costs_for_sol(x,a,b,c,n,d,lam,min_d,max_d,min_tt,max_tt,m):
-    dist = d*x
-    tt = x*(a*(1+b*(x/c)**n))
-    return lam*( (dist-min_d)/(max_d-min_d) ) + (1-lam)*( (tt-min_tt)/(max_tt-min_tt) )
+    dist = distance(x,d)
+    tt = travel_time(x,a,b,c,n)
+    return lam*( dist ) + (1-lam)*( tt ) 
 
 def path_costs_for_sol(f,D,a,b,c,n,d,lam,min_d,max_d,min_tt,max_tt,m):
     x = edge_flows(f,D,a,b,c,n)
@@ -74,7 +81,9 @@ def gekko_optimise_column_gen(
     max_d=1,
     max_tt=1,
     remote=False,
-    initial_paths=1):
+    initial_paths=1,
+    max_iter=3000,
+    otol=1.0e-6):
 
     # compute demand vector
 
@@ -130,12 +139,9 @@ def gekko_optimise_column_gen(
     od_ids = []
     i = 0
     od_id = 0
-    for origin, destinations in trips.items():
 
-        # Create a copy of the graph and remove the out edges that are connected to zones based on whether they are 
-        # prohibited to be thru nodes
-
-        J = G.copy()
+    J = G.copy()
+    try:
         if G.graph['first_thru_node'] > 1:
             print('here')
             print(G.graph['first_thru_node'] )
@@ -143,14 +149,22 @@ def gekko_optimise_column_gen(
             zones_prohibited += list(range(origin+1, G.graph['first_thru_node']))
             out_edges_for_removal = G.out_edges(zones_prohibited)
             J.remove_edges_from(out_edges_for_removal)
+    except KeyError:
+        print('No thru node given')
+
+    for origin, destinations in trips.items():
+
+        # Create a copy of the graph and remove the out edges that are connected to zones based on whether they are 
+        # prohibited to be thru nodes
+
+        
             #print(zones_prohibited)
 
         # calculate shortest paths, networkx does not (check) have an option for a list of targets
         #lengths, all_paths = nx.single_source_dijkstra(J, source=origin, target=None, weight='weight')
         # iterate through the destinations for an origin
         for destination in destinations:
-            
-            
+
             # calculate shortest paths, networkx does not (check) have an option for a list of targets
             
             # get demand associated with origin/destination
@@ -162,9 +176,9 @@ def gekko_optimise_column_gen(
                 od_ids.append(od_id)
                 
                 demands.append(demand)
-                paths = k_shortest_paths(G, origin, destination, initial_paths)
+                paths = k_shortest_paths(J, origin, int(destination), initial_paths)
                 for path in paths:
-                    path_edges = [G[u][v]['id'] for u,v in utils_graph.edges_from_path(path)]
+                    path_edges = [J[u][v]['id'] for u,v in utils_graph.edges_from_path(path)]
                     path_vector = np.zeros(no_edges,dtype="int32")
                     path_vector[path_edges] = 1
                     
@@ -174,7 +188,6 @@ def gekko_optimise_column_gen(
                     no_paths += 1
                 # if this is the first iteration, then assign all demand to shortest path
 
-                print(od_paths[od_id]['paths'])
                 od_id += 1
 
     # require 
@@ -190,7 +203,7 @@ def gekko_optimise_column_gen(
 
         #Set global options
         m.options.IMODE = 3 #steady state optimization
-        m.options.SOLVER = 3
+        #m.options.SOLVER = 3
         
         od_paths_ids = {}
         for od_index, value in od_paths.items():
@@ -211,12 +224,16 @@ def gekko_optimise_column_gen(
         
         #Solve simulation
         #m.solve(disp = True)  
+        m.options.MAX_ITER=max_iter
+        m.options.OTOL = otol
         m.solve()  
 
-        x = edge_flows_for_sol(f,D,a,b,c,n)
-        t = edge_costs_for_sol(x,a,b,c,n,d,lam,min_d,max_d,min_tt,max_tt,m)
 
-        
+        x = edge_flows_for_sol(f,D,a,b,c,n)
+        # note this might give negative cost edges. Fix by add absolute value of minimum to shift minimum to 0
+        # e.g. min = -0.3, shift to 0
+        t = edge_costs_for_sol(x,a,b,c,n,d,lam,min_d,max_d,min_tt,max_tt,m)
+        t = t + np.abs(np.min(t))
         
         utils_graph.update_edge_attribute(J, 'weight',t)
 
@@ -261,7 +278,7 @@ def gekko_optimise_column_gen(
         if no_new_paths == 0:
             break
     
-    return edge_flows(f,D,a,b,c,n), path_costs_for_sol, x, edge_costs_for_sol, m.options.OBJFCNVAL
+    return edge_flows(f,D,a,b,c,n), path_costs_for_sol, x, edge_costs_for_sol, m.options.OBJFCNVAL, np.sum(distance(x,d)), np.sum(travel_time(x,a,b,c,n)) 
         
                 
 

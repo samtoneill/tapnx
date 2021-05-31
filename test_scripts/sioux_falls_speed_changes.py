@@ -62,7 +62,7 @@ G.graph['first_thru_node'] = 0
 
 
 tol = 10**-3
-max_iter = 50
+max_iter = 100
 #G, data = tapnx.gradient_projection(G,collect_data=True,aec_gap_tol=tol,max_iter=max_iter)
 # plt.plot(data['AEC'], label='Gradient Projection 1')
 # plt.plot(data['no_paths'], label='No. paths')
@@ -90,36 +90,43 @@ max_iter = 50
   #plt.yscale('log')
 
 
-# tfc_results = []
-# tt_results = []
+tfc_results = []
+tt_results = []
+speed_changes = []
+for i in range(len(a)):
+  print(i)
+  for s in [-30,-20,-10,-5,5,10,20,30]:
+    m_new = np.copy(m)
+    m_new[i]+=s
+    a_new = d/(m_new/60)
+    tapnx.update_edge_attribute(G, 'a', a_new)
 
-# for i in range(len(a)):
-#     print(i)
-#     m_new = np.copy(m)
-#     m_new[i]+=5
-#     a_new = d/(m_new/60)
-#     tapnx.update_edge_attribute(G, 'a', a_new)
+    G, data = tapnx.gradient_projection(
+      G,
+      collect_data=True,
+      aec_gap_tol=tol,
+      max_iter=max_iter)
+    x = data['x'][-1]
+    tfc = total_fuel_consumption(x,c,d,m)
+    tfc_results.append(tfc)
+    tt = total_travel_time(x,c,d,m)
+    tt_results.append(tt)
+    speed_changes.append((i,s))
+    print(np.sum(data['objective'][-1]))
 
-#     G, data = tapnx.gradient_projection(
-#       G,
-#       collect_data=True,
-#       aec_gap_tol=tol,
-#       max_iter=max_iter)
-#     x = data['x'][-1]
-#     tfc = total_fuel_consumption(x,c,d,m)
-#     tfc_results.append(tfc)
-#     tt = total_travel_time(x,c,d,m)
-#     tt_results.append(tt)
-#     print(np.sum(data['objective'][-1]))
+data_to_save = {'Total fuel consumption': tfc_results, 'Total Travel Time': tt_results, 'Road and speed change':speed_changes}
+df = pd.DataFrame.from_dict(data_to_save)
+df.to_csv('test_data/{}/{}_results_speed_changes_multiple.csv'.format(filename, filename))
 
-# plt.plot(tfc_results, tt_results, 'o')
-# plt.xlabel('No. Iterations')
-# plt.ylabel('AEC')
-# plt.yscale('log')
-# plt.legend()
 
-# plt.figure()
-# plt.plot(data['no_paths'], data['AEC'])
-# plt.yscale('log')
+plt.plot(tfc_results, tt_results, 'o')
+plt.xlabel('No. Iterations')
+plt.ylabel('AEC')
+plt.yscale('log')
+plt.legend()
 
-# plt.show()
+plt.figure()
+plt.plot(data['no_paths'], data['AEC'])
+plt.yscale('log')
+
+plt.show()

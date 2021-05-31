@@ -3,48 +3,60 @@ import tapnx as tapnx
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+import time as time
+
+filename = 'MATLAB_test'
+nodes = None
+
+#filename = 'siouxfallswithspeeds'
+#filename = 'smallsiouxfalls'
+#nodes = True
+
+G = tapnx.graph_from_csv(filename, nodes=nodes, trips=True, edge_attr=True)
+if nodes:
+    fig, ax = tapnx.plot_graph(G, node_size=200, node_labels=True)
+    plt.show()
+
+remote = False
+f,cf,x,cx,min_d,_,_ = tapnx.gekko_optimise_column_gen(G,lam=1, remote=remote,d=True)
+f,cf,x,cx,max_d,_,_ = tapnx.gekko_optimise_column_gen(G,min_max_type=-1, lam=1, remote=remote,d=True)
+
+f,cf,x,cx,min_tt,_,_ = tapnx.gekko_optimise_column_gen(G,lam=0, remote=remote,d=True)
+f,cf,x,cx,max_tt,_,_ = tapnx.gekko_optimise_column_gen(G,min_max_type=-1, lam=0, remote=remote,d=True)
+
+max_tt = -max_tt
+max_d = -max_d
 
 
-# filename = 'MATLAB_test'
 
-# df_edges, df_nodes, df_trips = tapnx.graph_from_csv(
-#     edges_filename = 'test_data/{}/{}_net.csv'.format(filename, filename),
-#     trips_filename = 'test_data/{}/{}_trips.csv'.format(filename, filename)
-# )
+dists = []
+tts = []
+lams = np.round(np.arange(0,1.01,0.1),2)
+#lams = np.round(np.arange(0.15,0.3,0.01),2)
+#lams = np.arange(0,1.01,0.1)
+for lam in lams:
+    print(lam)
+    time.sleep(1)
+    f,cf,x,cx,min_ws,dist,tt = tapnx.gekko_optimise_column_gen(G,lam=lam,remote=remote,min_d=min_d,max_d=max_d,min_tt=min_tt,max_tt=max_tt,d=True,otol=1.0e-8)
+    dists.append(dist)
+    tts.append(tt)
 
-# G = tapnx.graph_from_edgedf(df_edges, edge_attr=True)
-# #G = tapnx.graph_positions_from_nodedf(G, df_nodes)
-# G = tapnx.trips_from_tripsdf(G, df_trips)
-
-# G.graph['first_thru_node'] = 0
-
-filename = 'siouxfalls'
-
-meta_data = tapnx.readTNTPMetadata('test_data/{}/{}_net.tntp'.format(filename,filename))
-df_edges = tapnx.TNTP_net_to_pandas('test_data/{}/{}_net.TNTP'.format(filename, filename), start_line=meta_data['END OF METADATA'])
-
-#df_nodes = tapnx.TNTP_node_to_pandas('test_data/{}/{}_node.TNTP'.format(filename, filename))
-df_trips = tapnx.TNTP_trips_to_pandas('test_data/{}/{}_trips.TNTP'.format(filename, filename))
-
-
-G = tapnx.graph_from_edgedf(df_edges, edge_attr=True)
-G = tapnx.trips_from_tripsdf(G, df_trips)
-G.graph['name'] = filename
-G.graph['no_zones'] = int(meta_data['NUMBER OF ZONES'])
-G.graph['no_nodes'] = int(meta_data['NUMBER OF NODES'])
-G.graph['first_thru_node'] = int(meta_data['FIRST THRU NODE'])
-G.graph['no_edges'] = int(meta_data['NUMBER OF LINKS'])
-
-
-# fig, ax = tapnx.plot_graph(G, node_size=200, node_labels=True)
-# plt.show()
-#f,cf,x,cx,min_d = tapnx.gekko_optimise_column_gen(G,lam=1)
-#f,cf,x,cx,max_d = tapnx.gekko_optimise_column_gen(G,min_max_type=-1, lam=1)
-
-f,cf,x,cx,min_tt = tapnx.gekko_optimise_column_gen(G,lam=0, remote=True)
-#f,cf,x,cx,max_tt = tapnx.gekko_optimise_column_gen(G,min_max_type=-1, lam=0)
 
 print(min_d)
 print(max_d)
+print(dists)
 print(min_tt)
 print(max_tt)
+print(tts)
+print((np.array(dists)-min_d)/(max_d-min_d))
+print((np.array(tts)-min_tt)/(max_tt-min_tt))
+plt.figure()
+plt.plot(dists,tts, 'o')
+
+plt.figure()
+plt.plot(lams,dists)
+
+plt.figure()
+plt.plot(lams,tts)
+
+plt.show()

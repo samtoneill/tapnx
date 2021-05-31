@@ -160,3 +160,13 @@ def _get_colors_by_value(vals, num_bins, cmap, start, stop, na_color, equal_size
         color_series = pd.Series(color_list, index=bins.index)
 
     return color_series
+
+def draw_additional_labels(G, labels, pos, shift, ax, font_color='k'):
+    
+    pos_higher = {}
+    for k, v in pos.items():
+            # shift node to right and up or down depending on sign of shift
+            pos_higher[k] = (v[0]+np.abs(shift), v[1]+shift)
+
+    nx.draw_networkx_labels(G, pos_higher,labels, font_color=font_color, ax=ax)
+    return ax

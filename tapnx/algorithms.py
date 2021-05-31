@@ -9,12 +9,11 @@ from numba import njit, jit
 
 from . import utils_graph
 
+def _edge_func_np(x,a,b,c,n):
+    return a*(1+b*(x/c)**n)
 
-def _edge_func_np(x,a,b,c,n,d,lam,max_d,max_tt):
-    return a*(1+b*(x/c)*(x/c)*(x/c)*(x/c))
-
-def _edge_func_derivative_np(x,a,b,c,n,d,lam,max_d,max_tt):
-    return (a*b*n*x*x*x)/(c*c*c*c)
+def _edge_func_derivative_np(x,a,b,c,n):
+    return (a*b*n*x**(n-1))/(c**n)
 
 def objective(x,a,b,c,n):
     return a*x*(1 + (b/(n+1))*(x/c)**n) 
@@ -46,7 +45,7 @@ def link_based_method(
 
     shortest_paths = dict()
 
-    no_edges = G.graph['no_edges']
+    no_edges = G.number_of_edges()
     x = np.zeros(no_edges,dtype="float64") 
     a = utils_graph.get_np_array_from_edge_attribute(G, 'a')
     b = utils_graph.get_np_array_from_edge_attribute(G, 'b')
@@ -58,10 +57,11 @@ def link_based_method(
     # Update to store shortest paths that have been used 
     data = {'AEC':[], 'relative_gap':[], 'x':[], 'weight':[], 'objective':[], 'no_paths':[]}
     
+    
     i = 0
     while True:
         weight = _edge_func_np(x,a,b,cap,n)
-        utils_graph.update_edge_attribute(G, 'weight', weight)
+        utils_graph.update_edge_attribute(H, 'weight', weight)
         y = np.zeros(no_edges,dtype="float64")
         print('iteration {}...............'.format(i))
         # iterate through the Origin/Destination pairs
@@ -69,13 +69,14 @@ def link_based_method(
             # Create a copy of the graph and remove the out edges that are connected to zones based on whether they are 
             # prohibited to be thru nodes
             H = G.copy()
-            if G.graph['first_thru_node'] > 1:
-                print('here')
-                zones_prohibited = list(range(1,origin))
-                zones_prohibited += list(range(origin+1, G.graph['first_thru_node']))
-                out_edges_for_removal = G.out_edges(zones_prohibited)
-                H.remove_edges_from(out_edges_for_removal)
-
+            try:
+                if G.graph['first_thru_node'] > 1:
+                    zones_prohibited = list(range(1,origin))
+                    zones_prohibited += list(range(origin+1, G.graph['first_thru_node']))
+                    out_edges_for_removal = G.out_edges(zones_prohibited)
+                    H.remove_edges_from(out_edges_for_removal)
+            except KeyError:
+                print('No thru node given')
             # calculate shortest paths, networkx does not (check) have an option for a list of targets
             lengths, all_paths = nx.single_source_dijkstra(H, source=origin, target=None, weight='weight')
             
@@ -91,7 +92,7 @@ def link_based_method(
                     shortest_paths[(origin,destination)] = {'path': shortest_path, 'path_length': shortest_path_length}
                     path_edges = utils_graph.edges_from_path(shortest_path)
                     # refer to previous work or look for possible smarter way to update edges
-                    path_edges = [G[u][v]['id'] for u,v in utils_graph.edges_from_path(shortest_path)]
+                    path_edges = [H[u][v]['id'] for u,v in utils_graph.edges_from_path(shortest_path)]
                     y[path_edges] += demand
         
         
@@ -131,7 +132,7 @@ def link_based_method(
         
         
         i+=1
-        
+       
     return G, data
 
 # need to update docstrings and kwgs (clean up)
@@ -170,31 +171,27 @@ def gradient_projection(G,
     alpha = 1,
     edge_func = _edge_func_np,
     edge_func_derivative = _edge_func_derivative_np,
-    d=False,
-    lam=0,
-    max_d=1,
-    max_tt=1):
+    verbose=False):
 
     # dictionary to store data about the instance the method was run
     data = {'AEC':[], 'relative_gap':[], 'x':[], 'weight':[], 'objective':[], 'no_paths':[]}
 
-    no_edges = G.graph['no_edges']
+    no_edges = G.number_of_edges()
+    no_nodes = G.number_of_nodes()
+    no_nodes_in_original = G.graph['no_nodes_in_original']
 
     # edge attributes used in the calculation of edge travel times
     a = utils_graph.get_np_array_from_edge_attribute(G, 'a')
     b = utils_graph.get_np_array_from_edge_attribute(G, 'b')
     cap = utils_graph.get_np_array_from_edge_attribute(G, 'c')
     n = utils_graph.get_np_array_from_edge_attribute(G, 'n')
-    if d:
-        d = utils_graph.get_np_array_from_edge_attribute(G, 'd')
-    else:
-        d = 1
 
     # initialise edge flow x and edge travel time t
     x = np.zeros(no_edges,dtype="float64") 
-    t = edge_func(x,a,b,cap,n,d,lam,max_d,max_tt)
-    trips = G.graph['trips']
+    
+    t = edge_func(x,a,b,cap,n)
 
+    trips = G.graph['trips']
     #dictionary to store shortest paths, indexed by (origin, destination)
     shortest_paths = dict()
 
@@ -202,32 +199,46 @@ def gradient_projection(G,
     # e.g. {(origin, destination):{{'paths':[1,2,3] 'cost', 4, 'flow',1}} stores a path [1,2,3] with length 4 and flow 1
     od_paths = defaultdict(lambda: {'paths':[], 'D': [], 'h':[] })
     i = 0
+    
     while True:
-        print('Iteration i = {}--------------------\n'.format(i))
+        if verbose:
+            print('Iteration i = {}--------------------\n'.format(i))
         
         # store the flow and weight at the start of the iteration (used for AEC)
         x_aec = np.copy(x)
         t_aec = np.copy(t)
         utils_graph.update_edge_attribute(G, 'weight',t)
         for origin, destinations in trips.items():
-
             # Create a copy of the graph and remove the out edges that are connected to zones based on whether they are 
             # prohibited to be thru nodes
-
-            J = G.copy()
-            if G.graph['first_thru_node'] > 1:
-                print('here')
-                print(G.graph['first_thru_node'] )
-                zones_prohibited = list(range(1,origin))
-                zones_prohibited += list(range(origin+1, G.graph['first_thru_node']))
-                out_edges_for_removal = G.out_edges(zones_prohibited)
-                J.remove_edges_from(out_edges_for_removal)
                 #print(zones_prohibited)
-
+            J = G.copy()
+            try:
+                if G.graph['first_thru_node'] > 1:
+                    zones_prohibited = list(range(1,origin))
+                    zones_prohibited += list(range(origin+1, G.graph['first_thru_node']))
+                    out_edges_for_removal = G.out_edges(zones_prohibited)
+                    J.remove_edges_from(out_edges_for_removal)
+            except KeyError:
+                pass
+                #print('No thru node given')
+            
             # calculate shortest paths, networkx does not (check) have an option for a list of targets
-            lengths, all_paths = nx.single_source_dijkstra(J, source=origin, target=None, weight='weight')
+            # when removing nodes this will cause a nx.NodeNotFound exception
+            ## define as an empty list incase 
+            all_paths = []
+            try:
+                lengths, all_paths = nx.single_source_dijkstra(J, source=origin, target=None, weight='weight')
+            except nx.NodeNotFound as e:
+                for destination in destinations:
+                    shortest_paths[(origin,destination)] = {'path': [], 'path_length': np.inf}
+                continue
+                # we need to now assign no path and np.inf to all destinations
+
             # iterate through the destinations for an origin
+            
             for destination in destinations:
+
                 # calculate shortest paths, networkx does not (check) have an option for a list of targets
                 
                 # get demand associated with origin/destination
@@ -236,7 +247,10 @@ def gradient_projection(G,
                 # if there are positive trips (otherwise no need to do anything)
                 if not ((demand == 0) or (demand == np.nan)):
                     # get the shortest path and its length for the origin/destination
-                    
+                    if not int(destination) in all_paths:
+                        #print('Path does not exist')
+                        shortest_paths[(origin,destination)] = {'path': [], 'path_length': np.inf}
+                        continue
                     shortest_path = all_paths[int(destination)]
                     shortest_path_length = lengths[int(destination)]
                     # get the paths for the 
@@ -269,8 +283,7 @@ def gradient_projection(G,
                         
                         # get path costs
                         c = np.dot(np.transpose(D),t)
-                        print((origin, int(destination)))
-                        print(c)
+       
                         # get cheapest path id
                         sp_id = np.argmin(c)
 
@@ -298,34 +311,22 @@ def gradient_projection(G,
                         od_paths[(origin, int(destination))]['h'] = h_prime.tolist()
                         
                         # update the travel times and the first derivative
-                        t = edge_func(x,a,b,cap,n,d,lam,max_d,max_tt)
-                        t_prime = edge_func_derivative(x,a,b,cap,n,d,lam,max_d,max_tt)
+                        t = edge_func(x,a,b,cap,n)
+                        t_prime = edge_func_derivative(x,a,b,cap,n)
                                                 
                     else:
                         # if first iteration then induce flow onto the edges x
                         # note that there is no need to anything if we have only one path and this is not the first iteration
                         if i == 0:
                             x += np.dot(D,h)
-                            t = edge_func(x,a,b,cap,n,d,lam,max_d,max_tt)
-                            t_prime = edge_func_derivative(x,a,b,cap,n,d,lam,max_d,max_tt)
+                            t = edge_func(x,a,b,cap,n)
+                            t_prime = edge_func_derivative(x,a,b,cap,n)
                         
                         
         # compute average excess cost, based on travel times at the time of computing shortest paths.
         AEC  = _average_excess_cost(trips, shortest_paths, x_aec, t_aec)
         rel_gap = _relative_gap(trips, shortest_paths, x_aec, t_aec)
         
-        
-        if i > 0:
-            print('AEC: {}'.format(AEC))
-        
-        # convergence tests
-        #if AEC < aec_gap_tol and i > 0:
-        #    break
-
-        if max_iter:
-            if i > max_iter:
-                break
-
         # collect data about the iterations of the method
         if collect_data and i > 0:
             data['AEC'].append(AEC)
@@ -334,18 +335,37 @@ def gradient_projection(G,
             data['weight'].append(t)
             data['objective'].append(objective(x,a,b,cap,n))
             data['no_paths'].append(get_D_matrix(od_paths).shape[1])
+
+        
+        if i > 0 and verbose:
+            print('AEC: {}'.format(AEC))
+        
+        # convergence tests
+        if AEC < aec_gap_tol and i > 0:
+            break
+        if max_iter:
+            if i > max_iter:
+                break
+
         i+=1
         #print(get_D_matrix(od_paths).shape)
+    data['nq_measure'] = _nq_measure(trips, shortest_paths, no_nodes_in_original)
+    data['LM_measure'] = _LM_measure(shortest_paths, no_nodes_in_original)
+    data['total_time'] = total_system_travel_time(x, t)
 
     return G, data
 
 def total_system_travel_time(x, weight):
     return np.dot(x,weight)
 
+# This should be equivalent to the equilibrium total travel time.
 def _all_demand_on_fastest_paths(trips, shortest_paths):
     
     k = np.array([value['path_length'] for key, value in shortest_paths.items()])
     
+    #in the case where there is no path, the shortest path will be np.inf, to make the AEC measure work, we replace with 0
+    k[k==np.inf] = 0
+
     d = np.array([trips[key[0]][key[1]] for key, value in shortest_paths.items()])
     #print([(key,value) for key, value in G.graph['sp'].items()])
     #time.sleep(2)
@@ -356,13 +376,34 @@ def _relative_gap(trips, shortest_paths, x, weight):
 
 def _average_excess_cost(trips, shortest_paths, x, weight):
     d =  np.array([trips[key[0]][key[1]] for key, value in shortest_paths.items()])
-    
+
     return (total_system_travel_time(x, weight)-_all_demand_on_fastest_paths(trips, shortest_paths))/np.sum(d)
 
 def get_D_matrix(od_paths):
     np_arrays = tuple([value['D'] for key, value in od_paths.items()])
     #flatten list
     np_arrays = [item for sublist in np_arrays for item in sublist]
-    return np.column_stack(np_arrays)
+    if np_arrays:
+        return np.column_stack(np_arrays)
+    else:
+        # in the case where there are no paths, return an empty array
+        return np.array([np_arrays])
 
 
+def _nq_measure(trips, shortest_paths, no_nodes_in_original):
+    
+    k = np.array([value['path_length'] for key, value in shortest_paths.items()])
+
+    d = np.array([trips[key[0]][key[1]] for key, value in shortest_paths.items()])
+    #print([(key,value) for key, value in G.graph['sp'].items()])
+    #time.sleep(2)
+    return np.sum(d/k)/no_nodes_in_original
+
+def _LM_measure(shortest_paths, no_nodes_in_original):
+    
+    k = np.array([value['path_length'] for key, value in shortest_paths.items()])
+
+    return np.sum(1/k)/(no_nodes_in_original*(no_nodes_in_original-1))
+
+def importance_measure(E, E1):
+    return (E-E1)/E
