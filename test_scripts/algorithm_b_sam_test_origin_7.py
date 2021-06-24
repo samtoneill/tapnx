@@ -1,9 +1,11 @@
 import tapnx as tapnx
 import networkx as nx
 import tapnx.utils_graph as utils_graph
+import tapnx.plot as plot_net
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import numpy as np
 
 def initialise_bushes(G, trips):
     no_nodes = len(G.nodes())
@@ -56,7 +58,7 @@ def assign_initial_flow(bush_dict, origin_trips, destinations):
             i = int(destination)
             while not i == origin:
                 i = pred_L[j]
-                print('adding {} for ({},{}) in bush {}'.format(demand,i,j,origin))
+                #print('adding {} for ({},{}) in bush {}'.format(demand,i,j,origin))
                 x[i,j] += demand
                 j = i
 
@@ -121,16 +123,19 @@ def drop_bush_edges(bush_dict):
             #drop edge if it does not cause an isolate
             if bush_dict['bush'].in_degree(v) > 1:
                 candidate_edges_for_removal.append((u,v))
-    print('\n\ncandidate_edges for removal: {}\n\n'.format(candidate_edges_for_removal))
+    #print('\n\ncandidate_edges for removal: {}\n\n'.format(candidate_edges_for_removal))
     for u,v in candidate_edges_for_removal:
-        if bush_dict['bush'].in_degree(v) > 1:
-            print('removing edge ({},{})'.format(u,v))
-            bush_dict['bush'].remove_edge(u,v)
-            dropped.append((u,v))
-        else:
-            print('removing edge would result in a isolate({},{})'.format(u,v))
+        # if bush_dict['bush'].in_degree(v) > 1:
+        #     print('removing edge ({},{})'.format(u,v))
+        #     bush_dict['bush'].remove_edge(u,v)
+        #     dropped.append((u,v))
+        # else:
+        #     print('removing edge would result in a isolate({},{})'.format(u,v))
+        #print('removing edge ({},{})'.format(u,v))
+        bush_dict['bush'].remove_edge(u,v)
+        dropped.append((u,v))
+                
     
-
     #fig, ax = tapnx.plot_graph(bush_dict['bush'], edge_labels=True)
     #plt.show()
     return bush_dict, dropped
@@ -158,7 +163,7 @@ def improve_bush_dial(bush_dict, G, c):
     for (i,j) in edges_added:
         B.add_edge(i,j)
         (dist_L[j] , pred_L[j]) = (dist_L[i] + c[i,j], i)
-        print('adding edge ({},{})'.format(i,j))
+        #print('adding edge ({},{})'.format(i,j))
           
     bush_dict['topological_order'] = list(nx.topological_sort(B))
 
@@ -171,7 +176,7 @@ def improve_bush_nie(bush_dict, G, c):
     B = bush_dict['bush']
     # get topological order
     topological_order = bush_dict['topological_order']
-    print(dist_U)
+
     edges_added = []
     # to avoid processing nodes without a max flow path, compute max flow dist, but don't update pred
     for j in topological_order[1:]:
@@ -180,14 +185,14 @@ def improve_bush_nie(bush_dict, G, c):
                 edges_added.append((i,j))
 
     for (i,j) in edges_added:
-        (dist_U[j] , pred_U[j]) = (dist_U[i] + c[i,j], i)
+        (dist_U[j], pred_U[j]) = (dist_U[i] + c[i,j], i)
         B.add_edge(i,j)
-        print('adding edge ({},{})'.format(i,j))
+        #print('adding edge ({},{})'.format(i,j))
           
     bush_dict['topological_order'] = list(nx.topological_sort(B))
 
 def get_branch_node(bush_dict, x, j, c, c_p):
-    print('getting branch node')
+    #print('getting branch node')
     pred_L = bush_dict['pred_L']
     pred_U = bush_dict['pot_pred_U']
     x = bush_dict['x']
@@ -235,7 +240,7 @@ def get_branch_node(bush_dict, x, j, c, c_p):
                 c_p_min += c_p[i_min, j_min]
 
     topological_order_paths.pop(0)
-    print(topological_order_paths)
+    #print(topological_order_paths)
     return i_min, topological_order_paths, x_min, x_max, c_min, c_max, c_p_min, c_p_max
 
 def update_path_flow(del_x, k, j, pred, x, c, c_p, coeff, x_b):
@@ -303,16 +308,17 @@ def get_delta_x_and_c(x_min, x_max, c_min, c_max, c_p_min, c_p_max):
 
 # equilibriate paired alternative segments to a given node
 def equilibriate_pas(bush_dict, j, x, c, c_p, coeff):
-    pred_U = bush_dict['pot_pred_U'] 
+    pred_U = bush_dict['pred_U'] 
     pred_L = bush_dict['pred_L'] 
     x_b = bush_dict['x'] 
     
     (k, top_order_to_update, x_min, x_max, c_min, c_max, c_p_min, c_p_max) = get_branch_node(bush_dict, x_b, j, c, c_p)
     #print(x_min, x_max, c_min, c_max, c_p_min, c_p_max)
-    print('branch node = {}'.format(k))
+    #print('branch node = {}'.format(k))
     del_x, del_c = get_delta_x_and_c(x_min, x_max, c_min, c_max, c_p_min, c_p_max)
-    print('c_min = {} and c_max = {}'.format(c_min, c_max))
-    print('x_min = {} and x_max = {}'.format(x_min, x_max))
+    #print('c_min = {} and c_max = {}'.format(c_min, c_max))
+    #print('x_min = {} and x_max = {}'.format(x_min, x_max))
+    
     if x_max > 0:
         # while True:
         #     # shift flow
@@ -320,15 +326,15 @@ def equilibriate_pas(bush_dict, j, x, c, c_p, coeff):
         #     if del_c < 0.000001:
         #         break
             
-        print('shifting {} flow for node {}'.format(del_x, j))
+        #print('shifting {} flow for node {}'.format(del_x, j))
         x_min, c_min, c_p_min = update_path_flow(del_x, k, j, pred_L, x, c, c_p, coeff, x_b)
         x_max, c_max, c_p_max = update_path_flow(-del_x, k, j, pred_U, x, c, c_p, coeff, x_b)
-        print('c_min = {} and c_max = {}'.format(c_min, c_max))
-        print('x_min = {} and x_max = {}'.format(x_min, x_max))
-        del_x, del_c = get_delta_x_and_c(x_min, x_max, c_min, c_max, c_p_min, c_p_max)
+        #print('c_min = {} and c_max = {}'.format(c_min, c_max))
+        #print('x_min = {} and x_max = {}'.format(x_min, x_max))
+        #del_x, del_c = get_delta_x_and_c(x_min, x_max, c_min, c_max, c_p_min, c_p_max)
 
         if not x_max > 0:
-            print('x_max is 0')
+            #print('x_max is 0')
             del_c = 0
             
             
@@ -338,7 +344,7 @@ def equilibriate_pas(bush_dict, j, x, c, c_p, coeff):
     else:
         del_c = 0
 
-    print('equilibriated pas for {}'.format(j))
+    #print('equilibriated pas for {}'.format(j))
             
     return top_order_to_update, del_c
 
@@ -346,10 +352,10 @@ def equilibriate_bush(bush_dict, x, c, c_p, coeff):
     topological_order = bush_dict['topological_order']
     pred_U = bush_dict['pred_U'] 
     pred_L = bush_dict['pred_L'] 
-    print(bush_dict['origin'])
-    print(topological_order)
+    #print(bush_dict['origin'])
+    #print(topological_order)
     nodes_to_scan = topological_order[::-1][:-1]
-    print(nodes_to_scan)
+    #print(nodes_to_scan)
     # scan nodes in reverse topological order, do not scan origin
     while True:
         max_del_c = 0
@@ -358,7 +364,7 @@ def equilibriate_bush(bush_dict, x, c, c_p, coeff):
             #print('pred_U[j] = {}'.format(pred_U[j]))
             #print('pred_L[j] = {}'.format(pred_L[j]))
             #if pred_U[j]:
-            print('\n\nscanning j={}\n\n'.format(j))
+            #print('\n\nscanning j={}\n\n'.format(j))
                 #print('pred_L = {}'.format(pred_L[j]))
                 #print('pred_U = {}'.format(pred_U[j]))
             top_order_to_update, del_c = equilibriate_pas(bush_dict, j, x, c, c_p, coeff)
@@ -367,8 +373,8 @@ def equilibriate_bush(bush_dict, x, c, c_p, coeff):
             relabel(bush_dict, topological_order, c)
                 #plot_bush(bush_dict)
                 #plt.show()
-        print(max_del_c)
-        print('\n\n')
+        #print(max_del_c)
+        #print('\n\n')
         #if max_del_c < 0.01:
             #time.sleep(1)
         break
@@ -412,7 +418,7 @@ def update_graph_weight(G, c):
     
 def compute_all_flow(bushes, no_nodes):
     x = np.zeros((no_nodes+1, no_nodes+1))
-    for orgin, bush_dict in bushes.items():
+    for origin, bush_dict in bushes.items():
         x += bush_dict['x']
 
     return x
@@ -439,7 +445,7 @@ def arc_cost(i,j,x,coeff):
     if k[i,j] > 0:
         return c_o[i,j]*(1+b[i,j]*(x/k[i,j])**n[i,j])
     else:
-        return 0
+        return c_o[i,j]
 
 def arc_derivative(i,j,x, coeff):
     c_o = coeff['c_o']
@@ -447,7 +453,7 @@ def arc_derivative(i,j,x, coeff):
     k = coeff['k']
     n = coeff['n']
     if k[i,j] > 0:
-        return n[i,j]*c_o[i,j]*b[i,j]/(k[i,j]**n[i,j])*x**(n[i,j]-1)
+        return (n[i,j]*c_o[i,j]*b[i,j]/(k[i,j]**n[i,j]))*x**(n[i,j]-1)
     else:
         return 0
 
@@ -462,8 +468,7 @@ def plot_bush(bush_dict, edge_label_attr='x'):
     dist_L_labels = {key: np.round(value, 2) for key, value in dist_L.items()}
     dist_U_labels = {key: np.round(value, 2) for key, value in dist_U.items()}
     fig, ax = tapnx.plot_graph(B, edge_labels=True, edge_label_attr=edge_label_attr, node_size=200)
-    utils_graph.draw_additional_labels(B, dist_L_labels, pos, -0.6, ax, font_color='g')
-    utils_graph.draw_additional_labels(B, dist_U_labels, pos,  0.6, ax, font_color='r')
+    plot_net.draw_additional_labels(B, dist_U_labels, pos,  0.6, ax, font_color='r')
     return fig, ax
 
 def plot_bush_potential(bush_dict, edge_label_attr='x'):
@@ -477,29 +482,42 @@ def plot_bush_potential(bush_dict, edge_label_attr='x'):
     dist_L_labels = {key: np.round(value, 2) for key, value in dist_L.items()}
     dist_U_labels = {key: np.round(value, 2) for key, value in pot_dist_U.items()}
     fig, ax = tapnx.plot_graph(B, edge_labels=True, edge_label_attr=edge_label_attr, node_size=200)
-    utils_graph.draw_additional_labels(B, dist_L_labels, pos, -0.6, ax, font_color='g')
-    utils_graph.draw_additional_labels(B, dist_U_labels, pos,  0.6, ax, font_color='r')
+    plot_net.draw_additional_labels(B, dist_L_labels, pos, -0.6, ax, font_color='g')
+    plot_net.draw_additional_labels(B, dist_U_labels, pos,  0.6, ax, font_color='r')
+    return fig, ax
+
+def plot_network(G, edge_label_attr='x'):
+    fig, ax = tapnx.plot_graph(G, edge_labels=True, edge_label_attr=edge_label_attr, node_size=200)
     return fig, ax
 
 filename = 'bush_based_test_06'
+filename = 'siouxfalls'
+filename = 'anaheim'
 
-df_edges, df_nodes, df_trips = tapnx.graph_from_csv(
-    edges_filename = 'test_data/{}/{}_net.csv'.format(filename, filename),
-    nodes_filename = 'test_data/{}/{}_node.csv'.format(filename, filename),
-    trips_filename = 'test_data/{}/{}_trips.csv'.format(filename, filename)
-)
+# df_edges, df_nodes, df_trips = tapnx.graph_from_csv(
+#     edges_filename = 'test_data/{}/{}_net.csv'.format(filename, filename),
+#     nodes_filename = 'test_data/{}/{}_node.csv'.format(filename, filename),
+#     trips_filename = 'test_data/{}/{}_trips.csv'.format(filename, filename)
+# )
 
-G = tapnx.graph_from_edgedf(df_edges, edge_attr=True)
-G = tapnx.graph_positions_from_nodedf(G,df_nodes)
-G = tapnx.trips_from_tripsdf(G, df_trips)
-trips = G.graph['trips']
+
+
+# G = tapnx.graph_from_edgedf(df_edges, edge_attr=True)
+# G = tapnx.graph_positions_from_nodedf(G,df_nodes)
+# G = tapnx.trips_from_tripsdf(G, df_trips)
+# trips = G.graph['trips']
+# a = utils_graph.get_np_array_from_edge_attribute(G,'a')
+# G = utils_graph.update_edge_attribute(G, 'weight',a)
+# G = utils_graph.update_edge_attribute(G, 'derivative_weight',a)
+
+G = tapnx.graph_from_csv(filename, nodes=False,trips=True, edge_attr=True)
 a = utils_graph.get_np_array_from_edge_attribute(G,'a')
 G = utils_graph.update_edge_attribute(G, 'weight',a)
 G = utils_graph.update_edge_attribute(G, 'derivative_weight',a)
-
+trips = G.graph['trips']
 pos = G.graph['pos']
 
-no_edges = G.graph['no_edges']
+no_edges = G.number_of_edges()
 no_nodes = len(G.nodes())
 bushes = initialise_bushes(G, trips)
 bushes = assign_initial_flows(bushes, trips)
@@ -509,7 +527,7 @@ c_o = np.zeros((no_nodes+1,no_nodes+1))
 b = np.zeros((no_nodes+1,no_nodes+1))
 k = np.zeros((no_nodes+1,no_nodes+1))
 n = np.zeros((no_nodes+1,no_nodes+1))
-for (u,v,d) in G.edges(data=True):
+for (u,v,d) in sorted(G.edges(data=True)):
     c_o[u,v] = d['a']
     b[u,v] = d['b']
     k[u,v] = d['c']
@@ -519,79 +537,140 @@ c = compute_all_arc_costs(x,coeff)
 c_p = compute_all_arc_derivatives(x,coeff)
 
 
-#relabel(bushes[7], bushes[7]['topological_order'], c)
-#fig, ax = plot_bush(bushes[7])
+bush_no = 17
+#relabel(bushes[bush_no], bushes[bush_no]['topological_order'], c)
+#fig, ax = plot_bush(bushes[bush_no])
 
-#drop_bush_edges(bushes[7])
+#drop_bush_edges(bushes[bush_no])
 
-#fig, ax = plot_bush(bushes[7])
+#fig, ax = plot_bush(bushes[bush_no])
 #plt.show()
-#improve_bush_nie(bushes[7], G, c)
-#fig, ax = plot_bush(bushes[7])
-#relabel(bushes[7], bushes[7]['topological_order'], c)
-#fig, ax = plot_bush(bushes[7])
-#fig, ax = plot_bush_potential(bushes[7])
+#improve_bush_nie(bushes[bush_no], G, c)
+#fig, ax = plot_bush(bushes[bush_no])
+#relabel(bushes[bush_no], bushes[bush_no]['topological_order'], c)
+#fig, ax = plot_bush(bushes[bush_no])
+#fig, ax = plot_bush_potential(bushes[bush_no])
 
 #plt.show()
 
-# equilibriate_bush(bushes[7], x, c, c_p, coeff)
-# fig, ax = plot_bush(bushes[7])
-# #print(relabel(bushes[7], bushes[7]['topological_order'], c))
+# equilibriate_bush(bushes[bush_no], x, c, c_p, coeff)
+# fig, ax = plot_bush(bushes[bush_no])
+# #print(relabel(bushes[bush_no], bushes[bush_no]['topological_order'], c))
 
 # plt.show()
-# drop_bush_edges(bushes[7])
-# improve_bush_dial(bushes[7], G, c)
-# fig, ax = plot_bush(bushes[7])
-# print(relabel(bushes[7], bushes[7]['topological_order'], c))
-# fig, ax = plot_bush(bushes[7])
+# drop_bush_edges(bushes[bush_no])
+# improve_bush_dial(bushes[bush_no], G, c)
+# fig, ax = plot_bush(bushes[bush_no])
+# print(relabel(bushes[bush_no], bushes[bush_no]['topological_order'], c))
+# fig, ax = plot_bush(bushes[bush_n)
 
 # plt.show()
 
-for origin in [7,9,17,19]:
+#origins = [7]
+#origins = [9]
+#origins = [7,9,17,19]
+
+origins = [origin for origin, destinations in trips.items()]
+
+
+for origin in origins:
+    c = compute_all_arc_costs(x,coeff)
+    c_p = compute_all_arc_derivatives(x,coeff)
     relabel(bushes[origin], bushes[origin]['topological_order'], c)
     #fig, ax = plot_bush(bushes[origin])
     #plt.show()
 
-for _ in range(50):
-    for origin in  [7,9,17,19]:
+for i in range(20):
+    print(i)
+    x = compute_all_flow(bushes, no_nodes)
+        
+    c = compute_all_arc_costs(x,coeff)
+    c_p = compute_all_arc_derivatives(x,coeff)
+    
+    for origin in origins:
         #plot_bush(bushes[origin])
         #plt.show()
         improve_bush_nie(bushes[origin], G, c)
         # plot_bush(bushes[origin])
         # plt.show()
         relabel(bushes[origin], bushes[origin]['topological_order'], c)
-        equilibriate_bush(bushes[origin], x, c, c_p, coeff)        
-        drop_bush_edges(bushes[origin])
+
+    # x = compute_all_flow(bushes, no_nodes)
+    # c = compute_all_arc_costs(x,coeff)
+    # c_p = compute_all_arc_derivatives(x,coeff)  
+
+    for origin in origins:
+        equilibriate_bush(bushes[origin], x, c, c_p, coeff) 
+    
+    x = compute_all_flow(bushes, no_nodes)
+    c = compute_all_arc_costs(x,coeff)
+    c_p = compute_all_arc_derivatives(x,coeff)
+
+    for origin in origins:
+       
         relabel(bushes[origin], bushes[origin]['topological_order'], c)
+        drop_bush_edges(bushes[origin])
+        #relabel(bushes[origin], bushes[origin]['topological_order'], c)
+
         
-for origin in [7,9,17,19]:
-    relabel(bushes[origin], bushes[origin]['topological_order'], c)
+    #for origin in origins:
+    #    relabel(bushes[origin], bushes[origin]['topological_order'], c)
 
-#fig, ax = plot_bush(bushes[7], edge_label_attr='weight')
-#fig, ax = plot_bush(bushes[9], edge_label_attr='weight')
-#fig, ax = plot_bush(bushes[17], edge_label_attr='weight')
-#fig, ax = plot_bush(bushes[19], edge_label_attr='weight')
-fig, ax = plot_bush(bushes[7], edge_label_attr='x')
-fig, ax = plot_bush_potential(bushes[7], edge_label_attr='x')
-#fig, ax = plot_bush(bushes[9], edge_label_attr='x')
-#fig, ax = plot_bush(bushes[17], edge_label_attr='x')
-#fig, ax = plot_bush(bushes[19], edge_label_attr='x')
-update_graph_flow(G, x)
-print(nx.get_edge_attributes(G,'x'))
-#plt.show()
+# fig, ax = plot_bush(bushes[7], edge_label_attr='weight')
+# fig, ax = plot_bush(bushes[9], edge_label_attr='weight')
+# fig, ax = plot_bush(bushes[17], edge_label_attr='weight')
+# fig, ax = plot_bush(bushes[19], edge_label_attr='weight')
+# fig, ax = plot_bush(bushes[7], edge_label_attr='x')
+# fig, ax = plot_bush_potential(bushes[7], edge_label_attr='x')
+# fig, ax = plot_bush(bushes[9], edge_label_attr='x')
+# fig, ax = plot_bush(bushes[17], edge_label_attr='x')
+# fig, ax = plot_bush(bushes[19], edge_label_attr='x')
 
-relabel(bushes[7], bushes[7]['topological_order'], c)
-drop_bush_edges(bushes[7])
-improve_bush_nie(bushes[7], G, c)
-relabel(bushes[7], bushes[7]['topological_order'], c)
-# fig, ax = plot_bush_potential(bushes[7], edge_label_attr='weight')
-# equilibriate_bush(bushes[7], x, c, c_p, coeff)
-# # drop_bush_edges(bushes[7])
-# relabel(bushes[7], bushes[7]['topological_order'], c)
-print(bushes[7]['pot_pred_U'])
-fig, ax = plot_bush_potential(bushes[7], edge_label_attr='x')
-fig, ax = plot_bush_potential(bushes[7], edge_label_attr='weight')
+# origins = [7]
+# for origin in origins:
+#     fig, ax = plot_bush_potential(bushes[origin], edge_label_attr='x')
+# #for origin in origins:
+# #    fig, ax = plot_bush_potential(bushes[origin], edge_label_attr='weight')
+
+# for origin in origins:
+#     improve_bush_nie(bushes[origin], G, c)
+#     relabel(bushes[origin], bushes[origin]['topological_order'], c)
+
+
+# for origin in origins:
+#     fig, ax = plot_bush_potential(bushes[origin], edge_label_attr='x')
+# # for origin in origins:
+# #     fig, ax = plot_bush_potential(bushes[origin], edge_label_attr='weight')
+
+# drop_bush_edges(bushes[origin])
+
+# for origin in origins:
+#     fig, ax = plot_bush_potential(bushes[origin], edge_label_attr='x')
+
+
+# fig, ax = plot_bush(bushes[bush_no], edge_label_attr='x')
+# fig, ax = plot_bush_potential(bushes[bush_no], edge_label_attr='x')
+
+# update_graph_flow(G, x)
+# print(nx.get_edge_attributes(G,'x'))
+x = compute_all_flow(bushes, no_nodes)
+x = [(i,j,x[i,j],c[i,j]) for (i,j) in sorted(G.edges()) if x[i,j] > 0]
+print(x)
+
 plt.show()
+
+# relabel(bushes[bush_no], bushes[bush_no]['topological_order'], c)
+# drop_bush_edges(bushes[bush_no])
+# improve_bush_nie(bushes[bush_no], G, c)
+# relabel(bushes[bush_no], bushes[bush_no]['topological_order'], c)
+# # fig, ax = plot_bush_potential(bushes[bush_no], edge_label_attr='weight')
+# # equilibriate_bush(bushes[bush_no], x, c, c_p, coeff)
+# # # drop_bush_edges(bushes[bush_no])
+# # relabel(bushes[bush_no], bushes[bush_no]['topological_order'], c)
+# print(bushes[bush_no]['pot_pred_U'])
+# fig, ax = plot_bush_potential(bushes[bush_no], edge_label_attr='x')
+# fig, ax = plot_bush_potential(bushes[bush_no], edge_label_attr='weight')
+# plt.show()
 
 # ISSUE WITH SCANNING NODES IN equilibriate bush
 # 

@@ -172,3 +172,79 @@ def readTNTPMetadata(demand_filename):
     print("Warning: END OF METADATA not found in file")
     return metadata
 
+# no zones == no_nodes. e.g. sioux falls 
+def pandas_trips_to_TNTP(df_trips, tntp_filename, no_zones):
+    df_trips.fillna(0, inplace=True)
+    
+    with open(tntp_filename, 'w') as f:
+        f.write("<NUMBER OF ZONES> {}\n".format(no_zones))
+        f.write("<TOTAL OD FLOW> {}\n".format(df_trips.sum().sum()))
+        f.write("<END OF METADATA>\n\n\n".format(no_zones))
+        for key, value in df_trips.iteritems():
+            f.write("Origin  {}\n".format(key))
+            l_all = ["\t{} :\t{};".format(index,v) for index, v in value.iteritems()]
+            for l in [l_all[x:x+5] for x in range(0, len(l_all),5)]:
+                f.write("".join(l))
+                f.write("\n")
+            f.write("\n\n")       
+    return None
+
+# this is only applicable for speed =0 and toll= 0 and length = free flow time. 
+# also number of zones = number of nodes
+# see Sioux Falls
+def pandas_net_to_TNTP(df_edges, tntp_filename, no_nodes, no_edges):
+    with open(tntp_filename, 'w') as f:
+        f.write("".join(["<NUMBER OF ZONES>", " {}".format(no_nodes),"\n\n"]))
+        f.write("".join(["<NUMBER OF NODES>", " {}".format(no_nodes),"\n\n"])) 
+        f.write("".join(["<FIRST THRU NODE>", " {}".format(1),"\n\n"]))
+        f.write("".join(["<NUMBER OF LINKS>", " {}".format(no_edges),"\n"]))
+        f.write("".join([
+            "<ORIGINAL HEADER>~\t",
+            "Init node\t",
+            "Term node\t",
+            "Capacity\t",
+            "Length\t",
+            "Free Flow Time\t",
+            "B\t",
+            "Power\t",
+            "Speed\t",
+            "limit\t",
+            "Toll\t",
+            "Type\t",
+            ";\n",
+            "<END OF METADATA>\n"
+        ]))
+        f.write("\n\n\n")
+        f.write("".join(
+            [
+            "~\t",
+            "init_node\t",
+            "term_node\t",
+            "capacity\t",
+            "length\t",
+            "free_flow_time\t",	
+            "b\t",
+            "power\t",
+            "speed\t"
+            "toll\t",
+            "link_type\t",
+            ";\n"
+            ]
+        ))
+        for index,row in df_edges.iterrows():
+            f.write("".join(["\t",str(int(row['source'])), 
+                        "\t", str(int(row['target'])),
+                        "\t", str(row['c']),
+                        "\t", str(row['a']),
+                        "\t", str(row['a']),
+                        "\t", str(row['b']),
+                        "\t", str(row['n']),
+                        "\t", str(0),
+                        "\t", str(0),
+                        "\t", str(1),
+                        "\t", ";",
+                        "\n"] 
+                        ))
+    #with open('file_to_write', 'w') as f:
+    #f.write('file contents\n')
+    return None

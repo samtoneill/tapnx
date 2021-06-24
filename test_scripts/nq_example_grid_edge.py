@@ -8,7 +8,7 @@ import matplotlib.cm as cm
 
 def importance_computation(G,E,u,v):
     H = tapnx.remove_edge(G, u,v)
-    H, data = tapnx.gradient_projection(H,edge_func=edge_func, edge_func_derivative=edge_func_derivative, collect_data=True,aec_gap_tol=tol,max_iter=max_iter)
+    H, data = tapnx.gradient_projection(H,edge_func=edge_func, edge_func_derivative=edge_func_derivative, collect_data=True,aec_gap_tol=tol,max_iter=max_iter,alpha=0.5)
     E1 = data['nq_measure']
     return tapnx.importance_measure(E,E1)
 
@@ -22,7 +22,7 @@ G = tapnx.graph_from_csv(filename, nodes=True, trips=True, edge_attr=True)
 # plt.show()
 tol = 10**-7
 max_iter = 1000
-G, data = tapnx.gradient_projection(G,edge_func=edge_func, edge_func_derivative=edge_func_derivative, collect_data=True,aec_gap_tol=tol,max_iter=max_iter)
+G, data = tapnx.gradient_projection(G,edge_func=edge_func, edge_func_derivative=edge_func_derivative, collect_data=True,aec_gap_tol=tol,max_iter=max_iter,alpha=0.5)
 E = data['nq_measure']
 
 importance_results = {}

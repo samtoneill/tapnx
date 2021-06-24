@@ -10,6 +10,8 @@ from .helper import TNTP_node_to_pandas
 from .helper import TNTP_trips_to_pandas
 from .helper import TNTP_flow_to_pandas
 from .helper import readTNTPMetadata
+from .helper import pandas_net_to_TNTP
+from .helper import pandas_trips_to_TNTP
 from .lp_algorithm import milp_tap
 from .plot import get_edge_colors_by_attr
 from .plot import draw_additional_labels

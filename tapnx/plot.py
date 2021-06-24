@@ -5,6 +5,7 @@ import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
+import numpy as np
 
 from . import utils_graph
 

@@ -56,12 +56,14 @@ def link_based_method(
 
     # Update to store shortest paths that have been used 
     data = {'AEC':[], 'relative_gap':[], 'x':[], 'weight':[], 'objective':[], 'no_paths':[]}
-    
+    no_edges = G.number_of_edges()
+    no_nodes = G.number_of_nodes()
+    no_nodes_in_original = G.graph['no_nodes_in_original']
     
     i = 0
     while True:
         weight = _edge_func_np(x,a,b,cap,n)
-        utils_graph.update_edge_attribute(H, 'weight', weight)
+        utils_graph.update_edge_attribute(G, 'weight', weight)
         y = np.zeros(no_edges,dtype="float64")
         print('iteration {}...............'.format(i))
         # iterate through the Origin/Destination pairs
@@ -132,8 +134,12 @@ def link_based_method(
         
         
         i+=1
-       
+    data['nq_measure'] = _nq_measure(trips, shortest_paths, no_nodes_in_original)
+    data['LM_measure'] = _LM_measure(shortest_paths, no_nodes_in_original)
+    data['total_time'] = total_system_travel_time(x, weight)
+    
     return G, data
+
 
 # need to update docstrings and kwgs (clean up)
 def frank_wolfe(G, **lbm_kwargs):
@@ -164,6 +170,7 @@ def successive_averages(G,  **lbm_kwargs):
     G, data = link_based_method(G, 'successive_averages',  **kwargs)
     return G, data
 
+#@profile
 def gradient_projection(G, 
     aec_gap_tol=10**-4, 
     max_iter=None, 
@@ -186,7 +193,6 @@ def gradient_projection(G,
     cap = utils_graph.get_np_array_from_edge_attribute(G, 'c')
     n = utils_graph.get_np_array_from_edge_attribute(G, 'n')
 
-    # initialise edge flow x and edge travel time t
     x = np.zeros(no_edges,dtype="float64") 
     
     t = edge_func(x,a,b,cap,n)
@@ -212,7 +218,8 @@ def gradient_projection(G,
             # Create a copy of the graph and remove the out edges that are connected to zones based on whether they are 
             # prohibited to be thru nodes
                 #print(zones_prohibited)
-            J = G.copy()
+            #J = G.copy()
+            J=G
             try:
                 if G.graph['first_thru_node'] > 1:
                     zones_prohibited = list(range(1,origin))
@@ -231,14 +238,13 @@ def gradient_projection(G,
                 lengths, all_paths = nx.single_source_dijkstra(J, source=origin, target=None, weight='weight')
             except nx.NodeNotFound as e:
                 for destination in destinations:
-                    shortest_paths[(origin,destination)] = {'path': [], 'path_length': np.inf}
+                    if not ((trips[origin][destination] == 0) or (trips[origin][destination] == np.nan)):
+                        shortest_paths[(origin,destination)] = {'path': [], 'path_length': np.inf}
                 continue
                 # we need to now assign no path and np.inf to all destinations
 
             # iterate through the destinations for an origin
-            
             for destination in destinations:
-
                 # calculate shortest paths, networkx does not (check) have an option for a list of targets
                 
                 # get demand associated with origin/destination
@@ -255,19 +261,18 @@ def gradient_projection(G,
                     shortest_path_length = lengths[int(destination)]
                     # get the paths for the 
                     paths = od_paths[(origin, int(destination))]['paths']
-
+                    
                     # overwrite the shortest path
                     shortest_paths[(origin,destination)] = {'path': shortest_path, 'path_length': shortest_path_length}
-
                     # if the shortest path is not yet in the paths, add it
                     if not tuple(shortest_path) in paths:
-                        
                         path_edges = [G[u][v]['id'] for u,v in utils_graph.edges_from_path(shortest_path)]
-                        path_vector = np.zeros(no_edges,dtype="int32")
+                        path_vector = np.zeros(no_edges,dtype="float64")
                         path_vector[path_edges] = 1
                         
                         od_paths[(origin, int(destination))]['D'].append(path_vector)
                         od_paths[(origin, int(destination))]['h'].append(0)
+                        #od_paths[(origin, int(destination))]['h'] = np.append(od_paths[(origin, int(destination))]['h'], 0)
                         od_paths[(origin, int(destination))]['paths'].append(tuple(shortest_path))
                     
                     # if this is the first iteration, then assign all demand to shortest path
@@ -283,7 +288,7 @@ def gradient_projection(G,
                         
                         # get path costs
                         c = np.dot(np.transpose(D),t)
-       
+
                         # get cheapest path id
                         sp_id = np.argmin(c)
 
@@ -291,7 +296,8 @@ def gradient_projection(G,
                         g = c - c[sp_id]
                         
                         # get all non common links for each of the paths
-                        non_common_links = np.abs(D - D[:,[sp_id]])
+                        non_common_links = np.abs(D - D[:,[sp_id]],dtype="float64")
+                        
                         # compute the approximation of the hessian using the non_common_links
                         H = np.dot(np.transpose(non_common_links), t_prime)
 
@@ -306,9 +312,10 @@ def gradient_projection(G,
                         
                         # add new flow and subtract previous flow
                         x += np.dot(D,h_prime-h)
-                        
+
                         # store the updated flow
                         od_paths[(origin, int(destination))]['h'] = h_prime.tolist()
+                        #od_paths[(origin, int(destination))]['h'] = h_prime
                         
                         # update the travel times and the first derivative
                         t = edge_func(x,a,b,cap,n)
@@ -349,14 +356,31 @@ def gradient_projection(G,
 
         i+=1
         #print(get_D_matrix(od_paths).shape)
-    data['nq_measure'] = _nq_measure(trips, shortest_paths, no_nodes_in_original)
-    data['LM_measure'] = _LM_measure(shortest_paths, no_nodes_in_original)
-    data['total_time'] = total_system_travel_time(x, t)
 
+    weight = utils_graph.get_np_array_from_edge_attribute(G, 'weight')
+    
+    data['nq_measure'] = _nq_measure(trips, shortest_paths, no_nodes_in_original)
+    data['nq_measure_norm'] = data['nq_measure']
+    data['LM_measure'] = _LM_measure(
+        G.copy(), 
+        trips, 
+        edge_func(np.zeros(G.number_of_edges(),dtype="float64"),a,b,cap,n),
+        no_nodes_in_original
+        )
+    data['total_time'] = total_system_travel_time(x, t)
+    data['zhu_measure'] = _zhu_measure(trips, shortest_paths)
+    data['zhu_measure_norm'] = data['zhu_measure']
+    data['reciprocal_system_optimal'] = 1/total_system_travel_time(x, weight)
+    data['reciprocal_tt'] = _reciprocal_tt(trips, shortest_paths, no_nodes_in_original)
+    data['reciprocal_tt_norm'] = data['reciprocal_tt']
+    
     return G, data
 
+
 def total_system_travel_time(x, weight):
-    return np.dot(x,weight)
+    epsilon = 10**(-10)
+    return np.dot(x,weight) + epsilon
+
 
 # This should be equivalent to the equilibrium total travel time.
 def _all_demand_on_fastest_paths(trips, shortest_paths):
@@ -399,11 +423,63 @@ def _nq_measure(trips, shortest_paths, no_nodes_in_original):
     #time.sleep(2)
     return np.sum(d/k)/no_nodes_in_original
 
-def _LM_measure(shortest_paths, no_nodes_in_original):
+def _reciprocal_tt(trips, shortest_paths, no_nodes_in_original):
     
-    k = np.array([value['path_length'] for key, value in shortest_paths.items()])
+    k = np.array([value['path_length'] for key, value in shortest_paths.items()], dtype="float64")
 
-    return np.sum(1/k)/(no_nodes_in_original*(no_nodes_in_original-1))
+    d = np.array([trips[key[0]][key[1]] for key, value in shortest_paths.items()], dtype="float64")
+    #print([(key,value) for key, value in G.graph['sp'].items()])
+    #time.sleep(2)
+    k[k==np.inf] = 0
+    epsilon = 10**(-10)
+    if np.sum( d*k) == 0:
+        #return 1/(np.sum(epsilon)/no_nodes_in_original)
+        return 1/(np.sum(epsilon))
+    else:
+        return 1/(np.sum( d*k))
 
-def importance_measure(E, E1):
-    return (E-E1)/E
+def _LM_measure(G, trips, t, no_nodes_in_original):
+    #utils_graph.update_edge_attribute(G, 'weight',t)
+    #print('edge functions = {}'.format(t))
+    # get shortest paths
+    no_nodes = G.number_of_nodes()
+    path_lengths = [list(dist.values()) for n, (dist, path) in nx.all_pairs_dijkstra(G)]
+    path_lengths = np.array([item for sublist in path_lengths for item in sublist if not item == 0])
+    #print(path_lengths)
+    if len(path_lengths):
+        return (np.sum(1/path_lengths))/(no_nodes_in_original*(no_nodes_in_original-1))
+    else:
+        return np.nan
+    #return (np.sum(1/path_lengths))/(no_nodes*(no_nodes-1))
+    # k = np.array([value['path_length'] for key, value in shortest_paths.items()])
+
+    # k[k==np.inf] = np.nan
+
+    #return np.sum(1/k)/(no_nodes_in_original*(no_nodes_in_original-1))
+
+def _zhu_measure(trips, shortest_paths):
+    
+    k = np.array([value['path_length'] for key, value in shortest_paths.items()], dtype="float64")
+
+    d = np.array([trips[key[0]][key[1]] for key, value in shortest_paths.items()], dtype="float64")
+
+    k[k==np.inf] = np.nan
+    epsilon = 10**(-10)
+    return np.sum( d*k)/np.sum(d)
+
+def global_importance():
+    return None
+
+def demand_weighted_importance():
+    return None
+
+def relative_unsatisfied_demand():
+    return None
+    
+def importance_measure(E, E1, use_max=False, zhu=False):
+    if use_max:
+        return (E-E1)/max(E,E1)
+    elif zhu:
+        return (E1-E)/E
+    else:
+        return (E-E1)/(E)

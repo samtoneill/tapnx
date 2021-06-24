@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 filename = 'amendedboyles190'
 G = tapnx.graph_from_csv(filename, nodes=True, trips=True, edge_attr=True)
-
+G.graph['no_edges']= G.number_of_edges()
 #filename = 'siouxfalls'
 #G = tapnx.graph_from_TNTP(filename, nodes=True, edge_attr=True)
 

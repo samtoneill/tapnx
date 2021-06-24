@@ -53,6 +53,7 @@ def graph_from_edgedf(df_edges, edge_attr=None):
     G.graph['weight'] = 'weight'
     #G.graph['no_edges'] = G.number_of_edges()
     G.graph['no_nodes_in_original'] = G.number_of_nodes()
+    G.graph['nodes_in_original'] = list(G.nodes())
     G.graph['pos'] = None
     G = _label_edges_with_id(G)
     return G
@@ -175,7 +176,6 @@ def get_np_array_from_edge_attribute(G, attr):
         array containg the specified atrribute of all edges
     """
     return np.array([value for (key, value) in sorted(nx.get_edge_attributes(G, attr).items())],dtype="float64")
-
 
 def _remove_edge(G, u, v):
     H = copy.deepcopy(G)

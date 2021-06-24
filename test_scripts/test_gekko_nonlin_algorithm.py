@@ -6,18 +6,23 @@ import matplotlib.pyplot as plt
 import time as time
 
 filename = 'MATLAB_test'
-nodes = None
 
-#filename = 'siouxfallswithspeeds'
+
+
+filename = 'siouxfallswithspeeds'
 #filename = 'smallsiouxfalls'
-#nodes = True
+#filename = 'siouxfalls'
+
+nodes = None
 
 G = tapnx.graph_from_csv(filename, nodes=nodes, trips=True, edge_attr=True)
 if nodes:
     fig, ax = tapnx.plot_graph(G, node_size=200, node_labels=True)
     plt.show()
 
-remote = False
+G.graph['no_edges'] = G.number_of_edges()
+
+remote = True
 f,cf,x,cx,min_d,_,_ = tapnx.gekko_optimise_column_gen(G,lam=1, remote=remote,d=True)
 f,cf,x,cx,max_d,_,_ = tapnx.gekko_optimise_column_gen(G,min_max_type=-1, lam=1, remote=remote,d=True)
 

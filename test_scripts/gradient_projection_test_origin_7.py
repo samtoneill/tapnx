@@ -6,31 +6,10 @@ import matplotlib.pyplot as plt
 
 filename = 'bush_based_test_06'
 
-df_edges, df_nodes, df_trips = tapnx.graph_from_csv(
-    edges_filename = 'test_data/{}/{}_net.csv'.format(filename, filename),
-    nodes_filename = 'test_data/{}/{}_node.csv'.format(filename, filename),
-    trips_filename = 'test_data/{}/{}_trips.csv'.format(filename, filename)
-)
+G = tapnx.graph_from_csv(filename, nodes=True, trips=True, edge_attr=True)
+pos = G.graph['pos']
 
-#meta_data = tapnx.readTNTPMetadata('test_data/{}/{}_net.tntp'.format(filename,filename))
-#df_edges = tapnx.TNTP_net_to_pandas('test_data/{}/{}_net.TNTP'.format(filename, filename), start_line=meta_data['END OF METADATA'])
-
-#df_nodes = tapnx.TNTP_node_to_pandas('test_data/{}/{}_node.TNTP'.format(filename, filename))
-#df_trips = tapnx.TNTP_trips_to_pandas('test_data/{}/{}_trips.TNTP'.format(filename, filename))
-
-
-
-G = tapnx.graph_from_edgedf(df_edges, edge_attr=True)
-G = tapnx.trips_from_tripsdf(G, df_trips)
-G.graph['name'] = filename
-#G.graph['no_zones'] = int(meta_data['NUMBER OF ZONES'])
-G.graph['no_nodes'] = len(G.nodes())
-G.graph['first_thru_node'] = 1
-G.graph['no_edges'] = len(G.edges())
-G = tapnx.graph_positions_from_nodedf(G, df_nodes)
-
-
-tol = 10**-3
+tol = 10**-5
 max_iter = 300
 #G, data_sa = tapnx.successive_averages(G, aec_gap_tol=tol, collect_data=True, max_iter=max_iter)
 #plt.plot(data_sa['AEC'], label='Successive Averages')
@@ -41,7 +20,12 @@ max_iter = 300
 G, data = tapnx.gradient_projection(G,collect_data=True,aec_gap_tol=tol,max_iter=max_iter,alpha=0.5)
 plt.plot(data['AEC'], label='Gradient Projection 1')
 # #print(data_fw['x'][-1])
-print(data['x'][-1])
+x =data['x'][-1]
+w =data['weight'][-1]
+print(x)
+print(sorted(G.edges()))
+
+print([(i,j,x,w) for ((i,j),x,w) in zip(sorted(G.edges()),x,w) if x > 0])
 #print(data['objective'][-1])
 plt.xlabel('No. Iterations')
 plt.ylabel('AEC')
