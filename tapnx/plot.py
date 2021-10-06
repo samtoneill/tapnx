@@ -102,12 +102,12 @@ def plot_nodes(G, pos, node_size= 2, ax=None):
     nx.draw_networkx_nodes(G, pos=pos, node_size=node_size)
     return fig, ax
 
-def plot_node_labels(G, pos, labels=None, ax=None):
+def plot_node_labels(G, pos, labels=None, font_size=12, ax=None):
     if ax is None:
         fig, ax = plt.subplots()
     else:
         fig = ax.figure
-    nx.draw_networkx_labels(G, pos=pos, labels=labels)
+    nx.draw_networkx_labels(G, pos=pos, labels=labels, font_size=font_size)
     return fig, ax
 
 def plot_edge_labels(G, pos, edge_labels=None, ax=None, font_size=10):

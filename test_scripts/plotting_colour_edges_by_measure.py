@@ -38,8 +38,8 @@ for filename in ['grid_side_to_side_large', 'grid_corner_to_corner_large', 'siou
     offset_outgoing_pos = {k:(x+shift,y+shift) for k,(x,y) in G.graph['pos'].items()}
     offset_incoming_pos = {k:(x-shift,y-shift) for k,(x,y) in G.graph['pos'].items()}
 
-    fig, ax = tapnx.plot_nodes(G, pos=G.graph['pos'], node_size=300, ax=ax)
-    fig, ax = tapnx.plot_node_labels(G, G.graph['pos'], ax=ax)
+    fig, ax = tapnx.plot_nodes(G, pos=G.graph['pos'], node_size=400, ax=ax)
+    fig, ax = tapnx.plot_node_labels(G, G.graph['pos'], ax=ax, font_size=16)
     fig, ax = tapnx.plot_edges(G, pos=offset_outgoing_pos, edge_color=edge_color_outgoing, edge_list=edge_list_outgoing, width=1.5, arrowsize=25, ax=ax)
     fig, ax = tapnx.plot_edges(G, pos=offset_incoming_pos, edge_color=edge_color_incoming, edge_list=edge_list_incoming, width=1.5, arrowsize=25, ax=ax)   
 
