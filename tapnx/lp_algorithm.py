@@ -39,6 +39,7 @@ def milp_tap(G):
     # e.g. {(origin, destination):{{'paths':[1,2,3] 'cost', 4, 'flow',1}} stores a path [1,2,3] with length 4 and flow 1
     od_paths = defaultdict(lambda: {})
     edge_paths_indexes = defaultdict(lambda: [])
+    
     # also need edges given by path edges
 
     edges = {G[u][v]['id']:(u,v) for u,v in sorted(G.edges())}

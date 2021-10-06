@@ -81,13 +81,15 @@ filename = 'siouxfallswithspeeds'
 #df_nodes = tapnx.TNTP_node_to_pandas('test_data/{}/{}_node.TNTP'.format(filename, filename))
 # df_trips = tapnx.TNTP_trips_to_pandas('test_data/{}/{}_trips.TNTP'.format(filename, filename))
 
-df_edges, df_nodes, df_trips = tapnx.graph_from_csv(
-    edges_filename = 'test_data/{}/{}_net.csv'.format(filename, filename),
-    nodes_filename = 'test_data/{}/{}_node.csv'.format(filename, filename),
-    trips_filename = 'test_data/{}/{}_trips.csv'.format(filename, filename)
-)
-G = tapnx.graph_from_edgedf(df_edges, edge_attr=True)
-G = tapnx.trips_from_tripsdf(G, df_trips)
+# df_edges, df_nodes, df_trips = tapnx.graph_from_csv(
+#     edges_filename = 'test_data/{}/{}_net.csv'.format(filename, filename),
+#     nodes_filename = 'test_data/{}/{}_node.csv'.format(filename, filename),
+#     trips_filename = 'test_data/{}/{}_trips.csv'.format(filename, filename)
+# )
+# G = tapnx.graph_from_edgedf(df_edges, edge_attr=True)
+# G = tapnx.trips_from_tripsdf(G, df_trips)
+
+G = tapnx.graph_from_csv(filename, nodes=False, trips=True, edge_attr=True)
 
 n = tapnx.get_np_array_from_edge_attribute(G, 'n')
 b = tapnx.get_np_array_from_edge_attribute(G, 'b')

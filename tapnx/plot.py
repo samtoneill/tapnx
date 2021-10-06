@@ -10,7 +10,7 @@ import numpy as np
 from . import utils_graph
 
 def get_edge_colors_by_attr(
-    G, attr, num_bins=None, cmap="plasma", start=0, stop=1, na_color="none", equal_size=False
+    G, attr, num_bins=None, cmap="plasma", start=0.1, stop=1, na_color="none", equal_size=False
 ):
     """
     Get colors based on edge attribute values.
@@ -44,7 +44,7 @@ def get_edge_colors_by_attr(
 
 def plot_graph(G, edge_color="#999999", edge_labels=False, edge_label_attr='id',
                 node_labels=True, node_size=2,
-                show=False, save=False, close=False, filepath=None):
+                show=False, save=False, close=False, filepath=None, edge_list=None):
     """
     Plot a networkx graph
     Parameters
@@ -80,12 +80,53 @@ def plot_graph(G, edge_color="#999999", edge_labels=False, edge_label_attr='id',
     """
 
     fig, ax = plt.subplots()
-    nx.draw(
-            G, pos=G.graph['pos'], node_size=node_size, 
-            edge_color=edge_color, 
-            ax=ax, with_labels=node_labels
-    )
+    nx.draw_networkx_nodes(G, pos=G.graph['pos'], node_size=node_size)
+    nx.draw_networkx_edges(G, pos=G.graph['pos'], edge_color=edge_color, edgelist=edge_list)
+    # nx.draw(
+    #         G, pos=G.graph['pos'], node_size=node_size, 
+    #         edge_color=edge_color, 
+    #         ax=ax, with_labels=node_labels
+    # )
     
+    if edge_labels:
+        edge_labels = nx.get_edge_attributes(G,edge_label_attr)
+        nx.draw_networkx_edge_labels(G, pos=G.graph['pos'], edge_labels=edge_labels)
+
+    return fig, ax
+
+def plot_nodes(G, pos, node_size= 2, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+    nx.draw_networkx_nodes(G, pos=pos, node_size=node_size)
+    return fig, ax
+
+def plot_node_labels(G, pos, labels=None, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+    nx.draw_networkx_labels(G, pos=pos, labels=labels)
+    return fig, ax
+
+def plot_edge_labels(G, pos, edge_labels=None, ax=None, font_size=10):
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+    nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=edge_labels, font_size=font_size)
+    return fig, ax
+
+def plot_edges(G, pos, edge_color="#999999", edge_labels=False, edge_label_attr='id', 
+                edge_list=None, width=1, arrowsize=10, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+
+    nx.draw_networkx_edges(G, pos=pos, edge_color=edge_color, edgelist=edge_list, width=width, arrowsize=arrowsize, ax=ax)
+
     if edge_labels:
         edge_labels = nx.get_edge_attributes(G,edge_label_attr)
         nx.draw_networkx_edge_labels(G, pos=G.graph['pos'], edge_labels=edge_labels)
@@ -161,6 +202,35 @@ def _get_colors_by_value(vals, num_bins, cmap, start, stop, na_color, equal_size
         color_series = pd.Series(color_list, index=bins.index)
 
     return color_series
+
+def get_colors(n, cmap="viridis", start=0.0, stop=1.0, alpha=1.0, return_hex=False):
+    """
+    Get `n` evenly-spaced colors from a matplotlib colormap.
+    Parameters
+    ----------
+    n : int
+        number of colors
+    cmap : string
+        name of a matplotlib colormap
+    start : float
+        where to start in the colorspace
+    stop : float
+        where to end in the colorspace
+    alpha : float
+        opacity, the alpha channel for the RGBa colors
+    return_hex : bool
+        if True, convert RGBa colors to HTML-like hexadecimal RGB strings. if
+        False, return colors as (R, G, B, alpha) tuples.
+    Returns
+    -------
+    color_list : list
+    """
+    color_list = [cm.get_cmap(cmap)(x) for x in np.linspace(start, stop, n)]
+    if return_hex:
+        color_list = [colors.to_hex(c) for c in color_list]
+    else:
+        color_list = [(r, g, b, alpha) for r, g, b, _ in color_list]
+    return color_list
 
 def draw_additional_labels(G, labels, pos, shift, ax, font_color='k'):
     

@@ -1,0 +1,3 @@
+,source,target,x,I_NQ,I_NQ_norm,I_LM,I_TT,zhu_measure,zhu_measure_norm,trips_adj,weight,edge_betweenness,edge_betweenness_w,reciprocal_system_optimal,reciprocal_tt,reciprocal_tt_norm,unsatisfied_demand,global_importance,demand_weighted_importance,x_fraction,weight_fraction
+0,1,2,100.0,0.8333,0.8333,0.5,0.8333,,,120,20.0,0.16666666666666666,0.16666666666666666,-5.0,-5.0,-0.8333,0.8333333333333334,,,0.8333333333333334,0.5
+1,1,3,20.0,0.1667,0.1667,0.5,0.1667,,,120,20.0,0.16666666666666666,0.16666666666666666,-0.2,-0.2,-0.1667,0.16666666666666666,,,0.16666666666666666,0.5

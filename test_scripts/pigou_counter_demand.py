@@ -21,5 +21,7 @@ G.graph['trips'][3]['2'] = 0
 
 G, data_G = tapnx.gradient_projection(G, edge_func=edge_func, edge_func_derivative=edge_func_derivative,collect_data=True,aec_gap_tol=tol)
 
+
+
 print(data_G['x'][-1])
 print(data_G['total_time'])

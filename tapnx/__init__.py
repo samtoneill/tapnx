@@ -15,8 +15,12 @@ from .helper import pandas_trips_to_TNTP
 from .lp_algorithm import milp_tap
 from .plot import get_edge_colors_by_attr
 from .plot import draw_additional_labels
+from .plot import plot_edges
+from .plot import plot_edge_labels
 from .plot import plot_graph
 from .plot import plot_graph_path
+from .plot import plot_nodes
+from .plot import plot_node_labels
 from .nonlin_algorithm import scipy_optimise_column_gen
 from .gekko_nonlin_algorithm import gekko_optimise_column_gen
 from .utils_graph import edges_from_path
