@@ -94,12 +94,12 @@ def plot_graph(G, edge_color="#999999", edge_labels=False, edge_label_attr='id',
 
     return fig, ax
 
-def plot_nodes(G, pos, node_size= 2, ax=None):
+def plot_nodes(G, pos, node_size= 2, ax=None, node_color='#1f78b4', edgecolors='#1f78b4'):
     if ax is None:
         fig, ax = plt.subplots()
     else:
         fig = ax.figure
-    nx.draw_networkx_nodes(G, pos=pos, node_size=node_size)
+    nx.draw_networkx_nodes(G, pos=pos, node_size=node_size, node_color=node_color,edgecolors=edgecolors)
     return fig, ax
 
 def plot_node_labels(G, pos, labels=None, font_size=12, ax=None):
@@ -119,7 +119,7 @@ def plot_edge_labels(G, pos, edge_labels=None, ax=None, font_size=10):
     return fig, ax
 
 def plot_edges(G, pos, edge_color="#999999", edge_labels=False, edge_label_attr='id', 
-                edge_list=None, width=1, arrowsize=10, ax=None):
+                edge_list=None, width=1, arrowsize=10, ax=None, min_source_margin=0.1, min_target_margin=0.1):
     if ax is None:
         fig, ax = plt.subplots()
     else:
