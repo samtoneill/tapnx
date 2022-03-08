@@ -10,7 +10,7 @@ import numpy as np
 #filename = 'grid_side_to_side_large'
 #filename = 'grid_corner_to_corner_large'
 
-for filename in ['grid_side_to_side_large', 'bush_based_test_06', 'siouxfalls', 'nq_example1']:
+for filename in ['braess_wiki', 'grid_side_to_side_large', 'bush_based_test_06', 'siouxfalls', 'nq_example1']:
 
 #for filename in ['siouxfalls_repositioned']:
     fig, ax = plt.subplots(figsize=(20,20))
